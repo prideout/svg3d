@@ -94,8 +94,21 @@ def klein(u, v):
     y = -2 * (1 - cos(u) / 2) * sin(v)
     return x, y, z
 
+def mobius_tube(u, v):
+    R = 1.5
+    # r = 0.25
+    # f = 20
+    # h = 0.05
+    # Pi = 4*atan(1)
+    n = 3
+    u = u * 2
+    sign = np.sign
 
-# Set up for the two simple renders.
+    x = (1.0*R + 0.125*sin(u/2)*pow(abs(sin(v)), 2/n)*sign(sin(v)) + 0.5*cos(u/2)*pow(abs(cos(v)), 2/n)*sign(cos(v)))*cos(u)
+    y = (1.0*R + 0.125*sin(u/2)*pow(abs(sin(v)), 2/n)*sign(sin(v)) + 0.5*cos(u/2)*pow(abs(cos(v)), 2/n)*sign(cos(v)))*sin(u)
+    z = -0.5*sin(u/2)*pow(abs(cos(v)), 2/n)*sign(cos(v)) + 0.125*cos(u/2)*pow(abs(sin(v)), 2/n)*sign(sin(v))
+
+    return x, y, z
 
 view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
 projection = pyrr.matrix44.create_perspective_projection(fovy=15, aspect=1, near=10, far=100)
@@ -209,3 +222,33 @@ def frontface_shader(face_index, winding):
 scene = svg3d.Scene()
 scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
 svg3d.Engine([svg3d.View(camera, scene)]).render('sphere_lighting.svg')
+
+# Mobius Tube
+
+slices, stacks, radius = 48, 32, 7
+faces = radius * parametric_surface(slices, stacks, mobius_tube)
+
+ones = np.ones(faces.shape[:2] + (1,))
+eyespace_faces = np.dstack([faces, ones])
+eyespace_faces = np.dot(eyespace_faces, view)[:,:,:3]
+shininess = 75
+L = pyrr.vector.normalize(np.float32([10, -10, 50]))
+E = np.float32([0, 0, 1])
+H = pyrr.vector.normalize(L + E)
+
+def frontface_shader(face_index, winding):
+    if winding < 0: return None
+    face = eyespace_faces[face_index]
+    p0, p1, p2 = face[0], face[1], face[2]
+    N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
+    df = max(0, np.dot(N, L))
+    sf = pow(max(0, np.dot(N, H)), shininess)
+    color = df * np.float32([0, 0.8, 1]) + sf * np.float32([1, 1, 1])
+    color = np.power(color, 1.0 / 2.2)
+    return dict(
+        fill=rgb(*color), fill_opacity='1.0',
+        stroke=rgb(*(color * 1.5)), stroke_width='0.001')
+
+scene = svg3d.Scene()
+scene.add_mesh(svg3d.Mesh(faces, frontface_shader))
+svg3d.Engine([svg3d.View(camera, scene)]).render('mobius_tube.svg')
