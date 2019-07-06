@@ -47,13 +47,8 @@ class View(NamedTuple):
 
 class Engine:
 
-    def __init__(self, view=None):
-        self.views = []
-        if view:
-            self.views.append(view)
-
-    def add_view(self, view: View):
-        self.views.append(view)
+    def __init__(self, views):
+        self.views = views
 
     def render(self, filename, size=(512,512), viewBox='-0.5 -0.5 1.0 1.0'):
         drawing = svgwrite.Drawing(filename, size, viewBox=viewBox)
@@ -86,7 +81,7 @@ class Engine:
 
         # Compute the winding direction of each polygon, determine its
         # style, and add it to the group. If the returned style is None,
-        # we cull away the polygon.
+        # cull away the polygon.
         group = drawing.g(**mesh.style)
         face_index = 0
         for face in faces:

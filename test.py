@@ -3,12 +3,31 @@
 import svg3d
 import pyrr
 import numpy as np
-import svgwrite
+import svgwrite.utils
 
 from math import *
 
 def rgb(r, g, b):
+    r = max(0.0, min(r, 1.0))
+    g = max(0.0, min(g, 1.0))
+    b = max(0.0, min(b, 1.0))
     return svgwrite.utils.rgb(r * 255, g * 255, b * 255)
+
+def cube():
+    return np.float32([
+        [(-10, +10, -10), (+10, +10, -10), (+10, -10, -10), (-10, -10, -10)],
+        [(-10, +10, +10), (+10, +10, +10), (+10, -10, +10), (-10, -10, +10)],
+        [(-10, -10, +10), (+10, -10, +10), (+10, -10, -10), (-10, -10, -10)],
+        [(-10, +10, +10), (+10, +10, +10), (+10, +10, -10), (-10, +10, -10)],
+        [(-10, -10, +10), (-10, +10, +10), (-10, +10, -10), (-10, -10, -10)],
+        [(+10, -10, +10), (+10, +10, +10), (+10, +10, -10), (+10, -10, -10)] ])
+
+def octahedron():
+    """Construct an eight-sided polyhedron"""
+    f =  sqrt(2.0) / 2.0
+    verts = np.float32([ ( 0, -1,  0), (-f,  0,  f), ( f,  0,  f), ( f,  0, -f), (-f,  0, -f), ( 0,  1,  0) ])
+    faces = np.int32([ (0, 2, 1), (0, 3, 2), (0, 4, 3), (0, 1, 4), (5, 1, 2), (5, 2, 3), (5, 3, 4), (5, 4, 1) ])
+    return verts[faces]
 
 def icosahedron():
     """Construct a 20-sided polyhedron"""
@@ -75,7 +94,46 @@ def klein(u, v):
     y = -2 * (1 - cos(u) / 2) * sin(v)
     return x, y, z
 
-# Create projection
+
+# Set up for the two simple renders.
+
+view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
+projection = pyrr.matrix44.create_perspective_projection(fovy=15, aspect=1, near=10, far=100)
+camera = svg3d.Camera(view, projection)
+thin_style = dict(fill='white', stroke='black', stroke_linejoin='round', fill_opacity='0.75', stroke_width='0.002')
+thick_style = dict(fill='white', stroke='black', stroke_linejoin='round', fill_opacity='0.75', stroke_width='0.005')
+
+left_viewport = svg3d.Viewport.from_string('-1.0 -0.5 1.0 1.0')
+right_viewport = svg3d.Viewport.from_string('0.0 -0.5 1.0 1.0')
+
+# Cube and Octahedron
+
+def shader(face_index, winding):
+    return dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin='round', stroke_width='0.005')
+
+cube_view = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(cube(), shader)), left_viewport)
+octahedron_view = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(12.0 * octahedron(), shader)), right_viewport)
+svg3d.Engine([cube_view, octahedron_view]).render('cube_and_octahedron.svg', (512, 256), '-1.0 -0.5 2.0 1.0')
+
+# Sphere and Klein
+
+def shader(face_index, winding):
+    return dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin='round', stroke_width='0.002')
+
+slices, stacks = 32, 32
+faces = 15.0 * parametric_surface(slices, stacks, sphere)
+sphere_view = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(faces, shader)), left_viewport)
+
+klein_view = pyrr.matrix44.create_look_at(eye=[50, -120, 50], target=[0, 0, 0], up=[0, 0, -1])
+klein_projection = pyrr.matrix44.create_perspective_projection(fovy=28, aspect=1, near=10, far=100)
+klein_camera = svg3d.Camera(klein_view, klein_projection)
+
+faces = 3.0 * parametric_surface(slices, stacks, klein)
+klein_view = svg3d.View(klein_camera, svg3d.Scene(svg3d.Mesh(faces, shader)), right_viewport)
+
+svg3d.Engine([sphere_view, klein_view]).render('sphere_and_klein.svg', (512, 256), '-1.0 -0.5 2.0 1.0')
+
+# Create projection for the more complex scenes.
 
 projection = pyrr.matrix44.create_perspective_projection(fovy=25, aspect=1, near=10, far=100)
 view = pyrr.matrix44.create_look_at(eye=[25, -20, 60], target=[0, 0, 0], up=[0, 1, 0])
@@ -86,15 +144,17 @@ camera = svg3d.Camera(view, projection)
 slices, stacks, radius = 64, 64, 12
 faces = radius * parametric_surface(slices, stacks, sphere)
 
+antialiasing = "auto" # use 'crispEdges' to fix cracks
+
 def shader(face_index, winding):
     slice = int(face_index / 64)
     stack = int(face_index % 64)
     if slice % 3 == 0 or stack % 3 == 0:
-        return dict(fill='black', fill_opacity='1.0', stroke='none')
-    return dict(fill='white', fill_opacity='0.75', stroke='none')
+        return dict(fill='black', fill_opacity='1.0', stroke='none', shape_rendering=antialiasing)
+    return dict(fill='white', fill_opacity='0.75', stroke='none', shape_rendering=antialiasing)
 
 scene = svg3d.Scene(svg3d.Mesh(faces, shader))
-svg3d.Engine(svg3d.View(camera, scene)).render('parametric_sphere.svg')
+svg3d.Engine([svg3d.View(camera, scene)]).render('parametric_sphere.svg')
 
 # Sphere Shell
 
@@ -121,7 +181,7 @@ def frontface_shader(face_index, winding):
 scene = svg3d.Scene()
 scene.add_mesh(svg3d.Mesh(12.0 * faces, backface_shader))
 scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
-svg3d.Engine(svg3d.View(camera, scene)).render('sphere_shell.svg')
+svg3d.Engine([svg3d.View(camera, scene)]).render('sphere_shell.svg')
 
 # Sphere Lighting
 
@@ -136,21 +196,16 @@ H = pyrr.vector.normalize(L + E)
 def frontface_shader(face_index, winding):
     if winding < 0: return None
     face = eyespace_faces[face_index]
-    p0, p1, p2 = face[0][:], face[1][:], face[2][:]
+    p0, p1, p2 = face[0], face[1], face[2]
     N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
     df = max(0, np.dot(N, L))
     sf = pow(max(0, np.dot(N, H)), shininess)
-
     color = df * np.float32([1, 1, 0]) + sf * np.float32([1, 1, 1])
-    color[0] = min(1.0, pow(color[0], 1.0 / 2.2))
-    color[1] = min(1.0, pow(color[1], 1.0 / 2.2))
-    color[2] = min(1.0, pow(color[2], 1.0 / 2.2))
-
+    color = np.power(color, 1.0 / 2.2)
     return dict(
         fill=rgb(*color), fill_opacity='1.0',
-        stroke='black', stroke_width='0.001',
-        shape_rendering='crispEdges')
+        stroke='black', stroke_width='0.001')
 
 scene = svg3d.Scene()
 scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
-svg3d.Engine(svg3d.View(camera, scene)).render('sphere_lighting.svg')
+svg3d.Engine([svg3d.View(camera, scene)]).render('sphere_lighting.svg')
