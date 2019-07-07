@@ -59,8 +59,8 @@ class Engine:
     def __init__(self, views):
         self.views = views
 
-    def render(self, filename, size=(512, 512), viewBox="-0.5 -0.5 1.0 1.0"):
-        drawing = svgwrite.Drawing(filename, size, viewBox=viewBox)
+    def render(self, filename, size=(512, 512), viewBox="-0.5 -0.5 1.0 1.0", **extra):
+        drawing = svgwrite.Drawing(filename, size, viewBox=viewBox, **extra)
         self.render_to_drawing(drawing)
         drawing.save()
 
