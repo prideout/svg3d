@@ -119,6 +119,13 @@ thick_style = dict(fill='white', stroke='black', stroke_linejoin='round', fill_o
 left_viewport = svg3d.Viewport.from_string('-1.0 -0.5 1.0 1.0')
 right_viewport = svg3d.Viewport.from_string('0.0 -0.5 1.0 1.0')
 
+# Octahedron
+
+style = dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin='round', stroke_width='0.005')
+mesh = svg3d.Mesh(15.0 * octahedron(), style=style)
+view = svg3d.View(camera, svg3d.Scene(mesh))
+svg3d.Engine([view]).render('octahedron.svg')
+
 # Cube and Octahedron
 
 def shader(face_index, winding):

@@ -27,7 +27,7 @@ class Camera(NamedTuple):
 
 class Mesh(NamedTuple):
     faces: np.ndarray
-    shader: Callable[[int, float], dict]
+    shader: Callable[[int, float], dict] = lambda face_index, winding: {}
     style: dict = {}
 
 class Scene:
@@ -88,7 +88,7 @@ class Engine:
             p0, p1, p2 = face[0], face[1], face[2]
             winding = -pyrr.vector3.cross(p2 - p0, p1 - p0)[2]
             style = mesh.shader(face_indices[face_index], winding)
-            if style:
+            if style != None:
                 group.add(drawing.polygon(face[:,0:2], **style))
             face_index = face_index + 1
 
