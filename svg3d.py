@@ -52,11 +52,14 @@ class Engine:
 
     def render(self, filename, size=(512,512), viewBox='-0.5 -0.5 1.0 1.0'):
         drawing = svgwrite.Drawing(filename, size, viewBox=viewBox)
+        self.render_to_drawing(drawing)
+        drawing.save()
+
+    def render_to_drawing(self, drawing):
         for view in self.views:
             projection = np.dot(view.camera.view, view.camera.projection)
             for mesh in view.scene.meshes:
                 drawing.add(self._create_group(drawing, projection, view.viewport, mesh))
-        drawing.save()
 
     def _create_group(self, drawing, projection, viewport, mesh):
         faces = mesh.faces

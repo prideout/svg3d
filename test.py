@@ -96,18 +96,12 @@ def klein(u, v):
 
 def mobius_tube(u, v):
     R = 1.5
-    # r = 0.25
-    # f = 20
-    # h = 0.05
-    # Pi = 4*atan(1)
     n = 3
     u = u * 2
     sign = np.sign
-
     x = (1.0*R + 0.125*sin(u/2)*pow(abs(sin(v)), 2/n)*sign(sin(v)) + 0.5*cos(u/2)*pow(abs(cos(v)), 2/n)*sign(cos(v)))*cos(u)
     y = (1.0*R + 0.125*sin(u/2)*pow(abs(sin(v)), 2/n)*sign(sin(v)) + 0.5*cos(u/2)*pow(abs(cos(v)), 2/n)*sign(cos(v)))*sin(u)
     z = -0.5*sin(u/2)*pow(abs(cos(v)), 2/n)*sign(cos(v)) + 0.125*cos(u/2)*pow(abs(sin(v)), 2/n)*sign(sin(v))
-
     return x, y, z
 
 view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
@@ -125,15 +119,6 @@ style = dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin=
 mesh = svg3d.Mesh(15.0 * octahedron(), style=style)
 view = svg3d.View(camera, svg3d.Scene(mesh))
 svg3d.Engine([view]).render('octahedron.svg')
-
-# Cube and Octahedron
-
-def shader(face_index, winding):
-    return dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin='round', stroke_width='0.005')
-
-cube_view = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(cube(), shader)), left_viewport)
-octahedron_view = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(12.0 * octahedron(), shader)), right_viewport)
-svg3d.Engine([cube_view, octahedron_view]).render('cube_and_octahedron.svg', (512, 256), '-1.0 -0.5 2.0 1.0')
 
 # Sphere and Klein
 
@@ -259,3 +244,40 @@ def frontface_shader(face_index, winding):
 scene = svg3d.Scene()
 scene.add_mesh(svg3d.Mesh(faces, frontface_shader))
 svg3d.Engine([svg3d.View(camera, scene)]).render('mobius_tube.svg')
+
+# Filmstrip
+
+def shader(face_index, winding):
+    return dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin='round', stroke_width='0.005')
+
+thin = dict(fill='white', fill_opacity='0.75', stroke='black', stroke_linejoin='round', stroke_width='0.001')
+
+view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
+projection = pyrr.matrix44.create_perspective_projection(fovy=15, aspect=1, near=10, far=100)
+camera = svg3d.Camera(view, projection)
+
+viewport0 = svg3d.Viewport.from_string('-2.5 -0.5 1.0 1.0')
+viewport1 = svg3d.Viewport.from_string('-1.5 -0.5 1.0 1.0')
+viewport2 = svg3d.Viewport.from_string('-0.5 -0.5 1.0 1.0')
+viewport3 = svg3d.Viewport.from_string(' 0.5 -0.5 1.0 1.0')
+viewport4 = svg3d.Viewport.from_string(' 1.5 -0.5 1.0 1.0')
+
+slices, stacks = 24, 32
+sphere_faces = 15.0 * parametric_surface(slices, stacks, sphere)
+
+slices, stacks = 32, 24
+klein_faces = 3.0 * parametric_surface(slices, stacks, klein)
+
+slices, stacks, radius = 48, 32, 7
+mobius_faces = radius * parametric_surface(slices, stacks, mobius_tube)
+
+view0 = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(cube(), shader)), viewport0) # cube
+view1 = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(12.0 * octahedron(), shader)), viewport1) # octahedron
+view2 = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(sphere_faces, style=thin)), viewport2) # sphere
+view3 = svg3d.View(klein_camera, svg3d.Scene(svg3d.Mesh(klein_faces, style=thin)), viewport3) # klein
+view4 = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(mobius_faces, frontface_shader)), viewport4) # mobius
+
+drawing = svgwrite.Drawing('filmstrip.svg', (256 * 5, 256), viewBox='-2.5 -0.5 5.0 1.0')
+# drawing.add(drawing.rect((-100, -100), (200, 200), fill='#707070'))
+svg3d.Engine([view0, view1, view2, view3, view4]).render_to_drawing(drawing)
+drawing.save()
