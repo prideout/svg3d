@@ -278,6 +278,5 @@ view3 = svg3d.View(klein_camera, svg3d.Scene(svg3d.Mesh(klein_faces, style=thin)
 view4 = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(mobius_faces, frontface_shader)), viewport4) # mobius
 
 drawing = svgwrite.Drawing('filmstrip.svg', (256 * 5, 256), viewBox='-2.5 -0.5 5.0 1.0')
-# drawing.add(drawing.rect((-100, -100), (200, 200), fill='#707070'))
 svg3d.Engine([view0, view1, view2, view3, view4]).render_to_drawing(drawing)
 drawing.save()
