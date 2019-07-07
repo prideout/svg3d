@@ -1,6 +1,6 @@
-![](https://prideout.net/blog/svg_wireframes/filmstrip.svg)
+<img src="prideout.net/blog/svg_wireframes/filmstrip.svg" width="512px">
 
-This single-file Python library for generating 3D wireframes in SVG format.
+This is a single-file Python library for generating 3D wireframes in SVG format.
 For usage instructions, look at `test.py`.
 
 ```
