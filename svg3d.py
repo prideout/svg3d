@@ -102,8 +102,10 @@ class Engine:
         group = drawing.g(**default_style)
         face_index = 0
         for face in faces:
-            p0, p1, p2 = face[0], face[1], face[2]
-            winding = pyrr.vector3.cross(p1 - p0, p2 - p0)[2]
+            winding = 0
+            if len(face) >= 3:
+                p0, p1, p2 = face[0], face[1], face[2]
+                winding = pyrr.vector3.cross(p1 - p0, p2 - p0)[2]
             style = shader(face_indices[face_index], winding)
             if style != None:
                 if mesh.circle_radius == 0:
