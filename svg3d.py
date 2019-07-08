@@ -11,10 +11,10 @@ from typing import NamedTuple, Callable, Sequence
 
 
 class Viewport(NamedTuple):
-    minx: float = -0.5
-    miny: float = -0.5
-    width: float = 1
-    height: float = 1
+    minx: float = -.5
+    miny: float = -.5
+    width: float = 1.
+    height: float = 1.
 
     @classmethod
     def from_string(cls, string_to_parse):
@@ -35,7 +35,7 @@ class Camera(NamedTuple):
 
 class Mesh(NamedTuple):
     faces: np.ndarray
-    shader: Callable[[int, float], dict] = lambda face_index, winding: {}
+    shader: Callable[[int, float], dict] = None
     style: dict = None
     circle_radius: float = 0
 
@@ -72,6 +72,8 @@ class Engine:
 
     def _create_group(self, drawing, projection, viewport, mesh):
         faces = mesh.faces
+        shader = mesh.shader or (lambda face_index, winding: {})
+        default_style = mesh.style or {}
 
         # Extend each point to a vec4, then multiply by the MVP.
         ones = np.ones(faces.shape[:2] + (1,))
@@ -82,7 +84,7 @@ class Engine:
         faces[:, :, :3] /= faces[:, :, 3:4]
         faces = faces[:, :, :3]
 
-        # Apply viewport transform to X Y.
+        # Apply viewport transform to X and Y.
         faces[:, :, 0:2] = (
             (faces[:, :, 0:2] + 1.0) * viewport.dims() / 2
         ) + viewport.min()
@@ -97,15 +99,12 @@ class Engine:
         # Compute the winding direction of each polygon, determine its
         # style, and add it to the group. If the returned style is None,
         # cull away the polygon.
-        if mesh.style == None:
-            group = drawing.g()
-        else:
-            group = drawing.g(**mesh.style)
+        group = drawing.g(**default_style)
         face_index = 0
         for face in faces:
             p0, p1, p2 = face[0], face[1], face[2]
             winding = pyrr.vector3.cross(p1 - p0, p2 - p0)[2]
-            style = mesh.shader(face_indices[face_index], winding)
+            style = shader(face_indices[face_index], winding)
             if style != None:
                 if mesh.circle_radius == 0:
                     group.add(drawing.polygon(face[:, 0:2], **style))
