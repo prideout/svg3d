@@ -1,13 +1,3 @@
-<img src="https://prideout.net/blog/svg_wireframes/filmstrip.svg" width="512px">
-
-This is a single-file Python library for generating 3D wireframes in SVG format.
-
-For a description of how the library was designed and implemented, check out
-[this blog post](https://prideout.net/blog/svg_wireframes/#using-the-api).
-
-## Usage example
-
-```python
 import numpy, svg3d, pyrr, math
 
 def get_octahedron_faces():
@@ -30,17 +20,3 @@ def generate_svg(filename):
     svg3d.Engine([view]).render(filename)
 
 generate_svg("octahedron.svg")
-```
-
-The above code snippet generates an image like this:
-
-<img src="https://prideout.net/blog/svg_wireframes/octahedron.svg" width="256px">
-
-## Running the test script
-
-```
-pipenv shell
-pipenv install
-./test.py
-open gallery.html
-```
