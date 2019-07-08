@@ -7,7 +7,7 @@ import numpy as np
 import pyrr
 import svgwrite
 
-from typing import NamedTuple, Callable
+from typing import NamedTuple, Callable, Sequence
 
 
 class Viewport(NamedTuple):
@@ -36,14 +36,12 @@ class Camera(NamedTuple):
 class Mesh(NamedTuple):
     faces: np.ndarray
     shader: Callable[[int, float], dict] = lambda face_index, winding: {}
-    style: dict = {}
+    style: dict = None
+    circle_radius: float = 0
 
 
-class Scene:
-    def __init__(self, mesh=None):
-        self.meshes = []
-        if mesh:
-            self.meshes.append(mesh)
+class Scene(NamedTuple):
+    meshes: Sequence[Mesh]
 
     def add_mesh(self, mesh: Mesh):
         self.meshes.append(mesh)
@@ -80,30 +78,40 @@ class Engine:
         faces = np.dstack([faces, ones])
         faces = np.dot(faces, projection)
 
-        # Divide X Y Z by W.
-        faces = faces[:, :, :3] / faces[:, :, 3:4]
+        # Divide X Y Z by W, then discard W.
+        faces[:, :, :3] /= faces[:, :, 3:4]
+        faces = faces[:, :, :3]
 
-        # Apply viewport transform.
-        faces[:, :, 0:2] = faces[:, :, 0:2] + 1
-        faces[:, :, 0:2] = faces[:, :, 0:2] * viewport.dims() / 2
-        faces[:, :, 0:2] = faces[:, :, 0:2] + viewport.min()
+        # Apply viewport transform to X Y.
+        faces[:, :, 0:2] = (
+            (faces[:, :, 0:2] + 1.0) * viewport.dims() / 2
+        ) + viewport.min()
 
         # Sort faces from back to front.
-        z_centroids = np.flip(np.sum(faces[:, :, 2], axis=1))
+        z_centroids = -np.sum(faces[:, :, 2], axis=1)
+        for face_index in range(len(z_centroids)):
+            z_centroids[face_index] /= len(faces[face_index])
         face_indices = np.argsort(z_centroids)
         faces = faces[face_indices]
 
         # Compute the winding direction of each polygon, determine its
         # style, and add it to the group. If the returned style is None,
         # cull away the polygon.
-        group = drawing.g(**mesh.style)
+        if mesh.style == None:
+            group = drawing.g()
+        else:
+            group = drawing.g(**mesh.style)
         face_index = 0
         for face in faces:
             p0, p1, p2 = face[0], face[1], face[2]
-            winding = -pyrr.vector3.cross(p2 - p0, p1 - p0)[2]
+            winding = pyrr.vector3.cross(p1 - p0, p2 - p0)[2]
             style = mesh.shader(face_indices[face_index], winding)
             if style != None:
-                group.add(drawing.polygon(face[:, 0:2], **style))
+                if mesh.circle_radius == 0:
+                    group.add(drawing.polygon(face[:, 0:2], **style))
+                else:
+                    for pt in face:
+                        group.add(drawing.circle(pt[0:2], mesh.circle_radius, **style))
             face_index = face_index + 1
 
         return group

@@ -9,6 +9,7 @@ verify_ssl = true
 numpy = "*"
 pyrr = "*"
 svgwrite = "*"
+mypy = "*"
 
 [requires]
 python_version = "3.7"

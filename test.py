@@ -8,6 +8,64 @@ import svgwrite.utils
 from math import *
 
 
+def generate_octahedra():
+    view = pyrr.matrix44.create_look_at(
+        eye=[-15, 60, 120], target=[0, 0, 0], up=[0, 1, 0]
+    )
+    projection = pyrr.matrix44.create_perspective_projection(
+        fovy=15, aspect=1, near=10, far=100
+    )
+    camera = svg3d.Camera(view, projection)
+
+    verts, faces = icosahedron()
+    verts, faces = np.float32(verts), np.uint32(faces)
+    faces = 15 * verts[faces]
+
+    centroids = []
+    for face in faces:
+        centroid = np.float32([0, 0, 0])
+        for vert in face:
+            centroid += vert
+        centroid /= len(face)
+        centroids.append(centroid)
+    centroids = np.float32([centroids])
+
+    point_style = dict(fill="black", fill_opacity="0.75", stroke="none")
+    poly_style = dict(
+        fill="#f0f0f0",
+        fill_opacity="0.75",
+        stroke="black",
+        stroke_linejoin="round",
+        stroke_width="0.01",
+    )
+
+    left_viewport = svg3d.Viewport.from_string("-1.0 -0.5 1.0 1.0")
+    right_viewport = svg3d.Viewport.from_string("0.0 -0.5 1.0 1.0")
+
+    back_shader = lambda face_index, winding: None if winding >= 0 else poly_style
+    front_shader = lambda face_index, winding: None if winding < 0 else poly_style
+
+    two_pass_scene = svg3d.Scene([])
+    two_pass_scene.add_mesh(svg3d.Mesh(faces, back_shader))
+    two_pass_scene.add_mesh(svg3d.Mesh(faces, front_shader))
+    two_pass_scene.add_mesh(
+        svg3d.Mesh(centroids, style=point_style, circle_radius=0.005)
+    )
+
+    one_pass_scene = svg3d.Scene([])
+    one_pass_scene.add_mesh(svg3d.Mesh(faces, style=poly_style))
+    one_pass_scene.add_mesh(
+        svg3d.Mesh(centroids, style=point_style, circle_radius=0.005)
+    )
+
+    view0 = svg3d.View(camera, one_pass_scene, left_viewport)
+    view1 = svg3d.View(camera, two_pass_scene, right_viewport)
+
+    svg3d.Engine([view0, view1]).render(
+        "octahedra.svg", (512, 256), "-1.0 -0.5 2.0 1.0"
+    )
+
+
 def rgb(r, g, b):
     r = max(0.0, min(r, 1.0))
     g = max(0.0, min(g, 1.0))
@@ -207,7 +265,7 @@ style = dict(
     stroke_width="0.005",
 )
 mesh = svg3d.Mesh(15.0 * octahedron(), style=style)
-view = svg3d.View(camera, svg3d.Scene(mesh))
+view = svg3d.View(camera, svg3d.Scene([mesh]))
 svg3d.Engine([view]).render("octahedron.svg")
 
 # Sphere and Klein
@@ -225,7 +283,9 @@ def shader(face_index, winding):
 
 slices, stacks = 32, 32
 faces = 15.0 * parametric_surface(slices, stacks, sphere)
-sphere_view = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(faces, shader)), left_viewport)
+sphere_view = svg3d.View(
+    camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), left_viewport
+)
 
 klein_view = pyrr.matrix44.create_look_at(
     eye=[50, -120, 50], target=[0, 0, 0], up=[0, 0, -1]
@@ -237,7 +297,7 @@ klein_camera = svg3d.Camera(klein_view, klein_projection)
 
 faces = 3.0 * parametric_surface(slices, stacks, klein)
 klein_view = svg3d.View(
-    klein_camera, svg3d.Scene(svg3d.Mesh(faces, shader)), right_viewport
+    klein_camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), right_viewport
 )
 
 svg3d.Engine([sphere_view, klein_view]).render(
@@ -275,7 +335,7 @@ def shader(face_index, winding):
     )
 
 
-scene = svg3d.Scene(svg3d.Mesh(faces, shader))
+scene = svg3d.Scene([svg3d.Mesh(faces, shader)])
 svg3d.Engine([svg3d.View(camera, scene)]).render("parametric_sphere.svg")
 
 # Sphere Shell
@@ -312,7 +372,7 @@ def frontface_shader(face_index, winding):
     )
 
 
-scene = svg3d.Scene()
+scene = svg3d.Scene([])
 scene.add_mesh(svg3d.Mesh(12.0 * faces, backface_shader))
 scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
 svg3d.Engine([svg3d.View(camera, scene)]).render("sphere_shell.svg")
@@ -343,7 +403,7 @@ def frontface_shader(face_index, winding):
     )
 
 
-scene = svg3d.Scene()
+scene = svg3d.Scene([])
 scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
 svg3d.Engine([svg3d.View(camera, scene)]).render("sphere_lighting.svg")
 
@@ -379,7 +439,7 @@ def frontface_shader(face_index, winding):
     )
 
 
-scene = svg3d.Scene()
+scene = svg3d.Scene([])
 scene.add_mesh(svg3d.Mesh(faces, frontface_shader))
 svg3d.Engine([svg3d.View(camera, scene)]).render("mobius_tube.svg")
 
@@ -425,20 +485,31 @@ klein_faces = 3.0 * parametric_surface(slices, stacks, klein)
 slices, stacks, radius = 48, 32, 7
 mobius_faces = radius * parametric_surface(slices, stacks, mobius_tube)
 
-view0 = svg3d.View(camera, svg3d.Scene(svg3d.Mesh(cube(), shader)), viewport0)  # cube
+# cube
+view0 = svg3d.View(camera, svg3d.Scene([svg3d.Mesh(cube(), shader)]), viewport0)
+
+# octahedron
 view1 = svg3d.View(
-    camera, svg3d.Scene(svg3d.Mesh(12.0 * octahedron(), shader)), viewport1
-)  # octahedron
+    camera, svg3d.Scene([svg3d.Mesh(12.0 * octahedron(), shader)]), viewport1
+)
+
+# sphere
 view2 = svg3d.View(
-    camera, svg3d.Scene(svg3d.Mesh(sphere_faces, style=thin)), viewport2
-)  # sphere
+    camera, svg3d.Scene([svg3d.Mesh(sphere_faces, style=thin)]), viewport2
+)
+
+# klein
 view3 = svg3d.View(
-    klein_camera, svg3d.Scene(svg3d.Mesh(klein_faces, style=thin)), viewport3
-)  # klein
+    klein_camera, svg3d.Scene([svg3d.Mesh(klein_faces, style=thin)]), viewport3
+)
+
+# mobius
 view4 = svg3d.View(
-    camera, svg3d.Scene(svg3d.Mesh(mobius_faces, frontface_shader)), viewport4
-)  # mobius
+    camera, svg3d.Scene([svg3d.Mesh(mobius_faces, frontface_shader)]), viewport4
+)
 
 drawing = svgwrite.Drawing("filmstrip.svg", (256 * 5, 256), viewBox="-2.5 -0.5 5.0 1.0")
 svg3d.Engine([view0, view1, view2, view3, view4]).render_to_drawing(drawing)
 drawing.save()
+
+generate_octahedra()
