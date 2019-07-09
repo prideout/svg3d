@@ -8,15 +8,101 @@ import svgwrite.utils
 from math import *
 
 sign = np.sign
+create_ortho = pyrr.matrix44.create_orthogonal_projection
+create_perspective = pyrr.matrix44.create_perspective_projection
+create_lookat = pyrr.matrix44.create_look_at
+
+# x and y specify the center of a picking region in window coordinates
+# width and height specify the size of the picking region in window coordinates
+# viewport is what's returned by glGetIntegerv(GL_VIEWPORT, ...)
+def pick_matrix(x, y, width, height, viewport):
+    sx = viewport.width / width
+    sy = viewport.height / height
+    tx = (viewport.width + 2.0 * (viewport.minx - x)) / width
+    ty = (viewport.height + 2.0 * (viewport.miny - y)) / height
+    return np.transpose(
+        np.float32(
+            [
+                [sx, 0.0, 0.0, tx],
+                [0.0, sy, 0.0, ty],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+    )
+
+
+def generate_overlapping_triangles():
+    X = 1
+    Y = 2
+
+    view = create_lookat(eye=[1.5, 1.5, 5], target=[1.5, 1.5, 0], up=[0, 1, 0])
+    projection = create_ortho(-X, X, -Y, Y, 0, 10)
+    pick = pyrr.matrix44.create_from_translation([1, 0, 0])
+    left_camera = svg3d.Camera(view, np.dot(projection, pick))
+
+    projection = create_ortho(-X, X, -Y, Y, 0, 10)
+    pick = pyrr.matrix44.create_from_translation([-1, 0, 0])
+    right_camera = svg3d.Camera(view, np.dot(pick, projection))
+
+    z0 = 0.00
+    z1 = 0.01
+    z2 = 0.02
+    z3 = -0.03
+
+    faces = np.float32(
+        [
+            [(0, 0, z0), (1, 0, z0), (0.5, 3, z0)],
+            [(0, 2, z1), (0, 3, z1), (3, 2.5, z1)],
+            [(2, 3, z2), (3, 3, z2), (2.5, 0, z2)],
+            [(3, 0, z3), (3, 1, z3), (0, 0.5, z3)],
+        ]
+    )
+
+    poly_style = dict(
+        fill="#e0e0e0",
+        fill_opacity="0.75",
+        stroke="black",
+        stroke_linejoin="round",
+        stroke_width="0.01",
+    )
+    left_scene = svg3d.Scene([svg3d.Mesh(faces, style=poly_style)])
+    left_view = svg3d.View(
+        left_camera, left_scene, svg3d.Viewport.from_string("-.5 -.5 .5 1")
+    )
+
+    z3 = 0.03
+
+    faces = np.float32(
+        [
+            [(0, 0, z0), (1, 0, z0), (0.5, 3, z0)],
+            [(0, 2, z1), (0, 3, z1), (3, 2.5, z1)],
+            [(2, 3, z2), (3, 3, z2), (2.5, 0, z2)],
+            [(3, 0, z3), (3, 1, z3), (0, 0.5, z3)],
+        ]
+    )
+
+    poly_style = dict(
+        # fill="red",
+        fill="#e0e0e0",
+        fill_opacity="0.75",
+        stroke="black",
+        stroke_linejoin="round",
+        stroke_width="0.01",
+    )
+    right_scene = svg3d.Scene([svg3d.Mesh(faces, style=poly_style)])
+    right_view = svg3d.View(
+        right_camera, right_scene, svg3d.Viewport.from_string("0 -.5 .5 1")
+    )
+
+    svg3d.Engine([left_view, right_view]).render(
+        "overlapping_triangles.svg", style="border: solid 2px black"
+    )
 
 
 def generate_octahedra():
-    view = pyrr.matrix44.create_look_at(
-        eye=[-15, -60, 120], target=[0, 0, 0], up=[0, 1, 0]
-    )
-    projection = pyrr.matrix44.create_perspective_projection(
-        fovy=15, aspect=1, near=10, far=100
-    )
+    view = create_lookat(eye=[-15, -60, 120], target=[0, 0, 0], up=[0, 1, 0])
+    projection = create_perspective(fovy=15, aspect=1, near=10, far=100)
     camera = svg3d.Camera(view, projection)
 
     verts, faces = icosahedron()
@@ -233,10 +319,8 @@ def mobius_tube(u, v):
     return x, y, z
 
 
-view = pyrr.matrix44.create_look_at(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
-projection = pyrr.matrix44.create_perspective_projection(
-    fovy=15, aspect=1, near=10, far=100
-)
+view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
+projection = create_perspective(fovy=15, aspect=1, near=10, far=100)
 camera = svg3d.Camera(view, projection)
 thin_style = dict(
     fill="white",
@@ -288,12 +372,8 @@ sphere_view = svg3d.View(
     camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), left_viewport
 )
 
-klein_view = pyrr.matrix44.create_look_at(
-    eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1]
-)
-klein_projection = pyrr.matrix44.create_perspective_projection(
-    fovy=28, aspect=1, near=10, far=100
-)
+klein_view = create_lookat(eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1])
+klein_projection = create_perspective(fovy=28, aspect=1, near=10, far=100)
 klein_camera = svg3d.Camera(klein_view, klein_projection)
 
 faces = 3.0 * parametric_surface(slices, stacks, klein)
@@ -307,10 +387,8 @@ svg3d.Engine([sphere_view, klein_view]).render(
 
 # Create projection for the more complex scenes.
 
-projection = pyrr.matrix44.create_perspective_projection(
-    fovy=25, aspect=1, near=10, far=100
-)
-view = pyrr.matrix44.create_look_at(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+projection = create_perspective(fovy=25, aspect=1, near=10, far=100)
+view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
 camera = svg3d.Camera(view, projection)
 
 # Parametric Sphere
@@ -465,10 +543,8 @@ thin = dict(
     stroke_width="0.001",
 )
 
-view = pyrr.matrix44.create_look_at(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
-projection = pyrr.matrix44.create_perspective_projection(
-    fovy=15, aspect=1, near=10, far=100
-)
+view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
+projection = create_perspective(fovy=15, aspect=1, near=10, far=100)
 camera = svg3d.Camera(view, projection)
 
 viewport0 = svg3d.Viewport.from_string("-2.5 -0.5 1.0 1.0")
@@ -514,3 +590,4 @@ svg3d.Engine([view0, view1, view2, view3, view4]).render_to_drawing(drawing)
 drawing.save()
 
 generate_octahedra()
+generate_overlapping_triangles()
