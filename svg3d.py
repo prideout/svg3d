@@ -54,8 +54,9 @@ class View(NamedTuple):
 
 
 class Engine:
-    def __init__(self, views):
+    def __init__(self, views, precision=5):
         self.views = views
+        self.precision = precision
 
     def render(self, filename, size=(512, 512), viewBox="-0.5 -0.5 1.0 1.0", **extra):
         drawing = svgwrite.Drawing(filename, size, viewBox=viewBox, **extra)
@@ -107,6 +108,7 @@ class Engine:
                 p0, p1, p2 = face[0], face[1], face[2]
                 winding = pyrr.vector3.cross(p1 - p0, p2 - p0)[2]
             style = shader(face_indices[face_index], winding)
+            face = np.around(face, self.precision)
             if style != None:
                 if mesh.circle_radius == 0:
                     group.add(drawing.polygon(face[:, 0:2], **style))
