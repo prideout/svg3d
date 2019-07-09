@@ -12,7 +12,7 @@ sign = np.sign
 
 def generate_octahedra():
     view = pyrr.matrix44.create_look_at(
-        eye=[-15, 60, 120], target=[0, 0, 0], up=[0, 1, 0]
+        eye=[-15, -60, 120], target=[0, 0, 0], up=[0, 1, 0]
     )
     projection = pyrr.matrix44.create_perspective_projection(
         fovy=15, aspect=1, near=10, far=100
@@ -233,7 +233,7 @@ def mobius_tube(u, v):
     return x, y, z
 
 
-view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
+view = pyrr.matrix44.create_look_at(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
 projection = pyrr.matrix44.create_perspective_projection(
     fovy=15, aspect=1, near=10, far=100
 )
@@ -289,7 +289,7 @@ sphere_view = svg3d.View(
 )
 
 klein_view = pyrr.matrix44.create_look_at(
-    eye=[50, -120, 50], target=[0, 0, 0], up=[0, 0, -1]
+    eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1]
 )
 klein_projection = pyrr.matrix44.create_perspective_projection(
     fovy=28, aspect=1, near=10, far=100
@@ -310,7 +310,7 @@ svg3d.Engine([sphere_view, klein_view]).render(
 projection = pyrr.matrix44.create_perspective_projection(
     fovy=25, aspect=1, near=10, far=100
 )
-view = pyrr.matrix44.create_look_at(eye=[25, -20, 60], target=[0, 0, 0], up=[0, 1, 0])
+view = pyrr.matrix44.create_look_at(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
 camera = svg3d.Camera(view, projection)
 
 # Parametric Sphere
@@ -384,7 +384,7 @@ ones = np.ones(faces.shape[:2] + (1,))
 eyespace_faces = np.dstack([faces, ones])
 eyespace_faces = np.dot(eyespace_faces, view)[:, :, :3]
 shininess = 100
-L = pyrr.vector.normalize(np.float32([20, -20, 50]))
+L = pyrr.vector.normalize(np.float32([20, 20, 50]))
 E = np.float32([0, 0, 1])
 H = pyrr.vector.normalize(L + E)
 
@@ -465,7 +465,7 @@ thin = dict(
     stroke_width="0.001",
 )
 
-view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
+view = pyrr.matrix44.create_look_at(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
 projection = pyrr.matrix44.create_perspective_projection(
     fovy=15, aspect=1, near=10, far=100
 )

@@ -21,12 +21,6 @@ class Viewport(NamedTuple):
         args = [float(f) for f in string_to_parse.split()]
         return cls(*args)
 
-    def min(self):
-        return np.float32([self.minx, self.miny])
-
-    def dims(self):
-        return np.float32([self.width, self.height])
-
 
 class Camera(NamedTuple):
     view: np.ndarray
@@ -86,9 +80,10 @@ class Engine:
         faces = faces[:, :, :3]
 
         # Apply viewport transform to X and Y.
-        faces[:, :, 0:2] = (
-            (faces[:, :, 0:2] + 1.0) * viewport.dims() / 2
-        ) + viewport.min()
+        faces[:, :, 0:1] = (1.0 + faces[:, :, 0:1]) * viewport.width / 2
+        faces[:, :, 1:2] = (1.0 - faces[:, :, 1:2]) * viewport.height / 2
+        faces[:, :, 0:1] += viewport.minx
+        faces[:, :, 1:2] += viewport.miny
 
         # Sort faces from back to front.
         z_centroids = -np.sum(faces[:, :, 2], axis=1)
@@ -106,7 +101,7 @@ class Engine:
             winding = 0
             if len(face) >= 3:
                 p0, p1, p2 = face[0], face[1], face[2]
-                winding = pyrr.vector3.cross(p1 - p0, p2 - p0)[2]
+                winding = pyrr.vector3.cross(p2 - p0, p1 - p0)[2]
             style = shader(face_indices[face_index], winding)
             face = np.around(face, self.precision)
             if style != None:
