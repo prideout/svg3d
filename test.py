@@ -7,6 +7,8 @@ import svgwrite.utils
 
 from math import *
 
+sign = np.sign
+
 
 def generate_octahedra():
     view = pyrr.matrix44.create_look_at(
@@ -215,7 +217,6 @@ def mobius_tube(u, v):
     R = 1.5
     n = 3
     u = u * 2
-    sign = np.sign
     x = (
         1.0 * R
         + 0.125 * sin(u / 2) * pow(abs(sin(v)), 2 / n) * sign(sin(v))

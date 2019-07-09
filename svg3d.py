@@ -11,10 +11,10 @@ from typing import NamedTuple, Callable, Sequence
 
 
 class Viewport(NamedTuple):
-    minx: float = -.5
-    miny: float = -.5
-    width: float = 1.
-    height: float = 1.
+    minx: float = -0.5
+    miny: float = -0.5
+    width: float = 1.0
+    height: float = 1.0
 
     @classmethod
     def from_string(cls, string_to_parse):
