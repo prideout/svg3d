@@ -60,10 +60,16 @@ class Engine:
     def render_to_drawing(self, drawing):
         for view in self.views:
             projection = np.dot(view.camera.view, view.camera.projection)
+
+            clip_path = drawing.defs.add(drawing.clipPath())
+            clip_min = view.viewport.minx, view.viewport.miny
+            clip_size = view.viewport.width, view.viewport.height
+            clip_path.add(drawing.rect(clip_min, clip_size))
+
             for mesh in view.scene.meshes:
-                drawing.add(
-                    self._create_group(drawing, projection, view.viewport, mesh)
-                )
+                g = self._create_group(drawing, projection, view.viewport, mesh)
+                g["clip-path"] = clip_path.get_funciri()
+                drawing.add(g)
 
     def _create_group(self, drawing, projection, viewport, mesh):
         faces = mesh.faces
