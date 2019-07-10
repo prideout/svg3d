@@ -385,6 +385,9 @@ svg3d.Engine([sphere_view, klein_view]).render(
     "sphere_and_klein.svg", (512, 256), "-1.0 -0.5 2.0 1.0"
 )
 
+quit()
+
+
 # Create projection for the more complex scenes.
 
 projection = create_perspective(fovy=25, aspect=1, near=10, far=100)

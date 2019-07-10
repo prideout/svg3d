@@ -50,20 +50,15 @@ def generate_svg_from_meshes(filename, meshes):
     projection = create_proj_matrix(fovy=15, aspect=1, near=10, far=100)
     camera = svg3d.Camera(view, projection)
     view = svg3d.View(camera, svg3d.Scene(meshes))
-    svg3d.Engine([view]).render(
-        filename,
-        style="""
-        margin: 20px;
-        border: solid 1px black;""",
-    )
+    svg3d.Engine([view]).render(filename, style="width: 100%; height: 100%;")
 
 
 style = dict(
-    fill="white",
+    fill="#e0efe7",
     fill_opacity="0.75",
     stroke="black",
     stroke_linejoin="round",
-    stroke_width="0.0025",
+    stroke_width="0.002",
 )
 
 meshes = create_meshes_from_glb("Avocado.glb", 10.0, style)
