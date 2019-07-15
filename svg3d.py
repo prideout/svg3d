@@ -17,6 +17,10 @@ class Viewport(NamedTuple):
     height: float = 1.0
 
     @classmethod
+    def from_aspect(cls, aspect_ratio: float):
+        return cls(-aspect_ratio / 2.0, -0.5, aspect_ratio, 1.0)
+
+    @classmethod
     def from_string(cls, string_to_parse):
         args = [float(f) for f in string_to_parse.split()]
         return cls(*args)
@@ -80,6 +84,17 @@ class Engine:
         ones = np.ones(faces.shape[:2] + (1,))
         faces = np.dstack([faces, ones])
         faces = np.dot(faces, projection)
+
+        # Reject trivially clipped polygons.
+        w = faces[:, :, 3:4]
+        xy = faces[:, :, 0:2]
+        accepted = np.logical_and(np.greater(xy, -w), np.less(xy, +w))
+        accepted = np.any(accepted, 2)  # vert is accepted if x or y or z are inside
+        accepted = np.any(accepted, 1)  # face is accepted if any vert are inside
+        degenerate = np.less_equal(w, 0)[:, :, 0]  # vert is bad if its w <= 0
+        degenerate = np.any(degenerate, 1)  # face is bad if any of its verts are bad
+        accepted = np.logical_and(accepted, np.logical_not(degenerate))
+        faces = np.compress(accepted, faces, axis=0)
 
         # Divide X Y Z by W, then discard W.
         faces[:, :, :3] /= faces[:, :, 3:4]
