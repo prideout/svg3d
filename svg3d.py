@@ -80,9 +80,8 @@ class Engine:
         shader = mesh.shader or (lambda face_index, winding: {})
         default_style = mesh.style or {}
 
-        # Extend each point to a vec4, then multiply by the MVP.
-        ones = np.ones(faces.shape[:2] + (1,))
-        faces = np.dstack([faces, ones])
+        # Extend each point to a vec4, then transform to clip space.
+        faces = np.dstack([faces, np.ones(faces.shape[:2])])
         faces = np.dot(faces, projection)
 
         # Reject trivially clipped polygons.
@@ -96,9 +95,8 @@ class Engine:
         accepted = np.logical_and(accepted, np.logical_not(degenerate))
         faces = np.compress(accepted, faces, axis=0)
 
-        # Divide X Y Z by W, then discard W.
-        faces[:, :, :3] /= faces[:, :, 3:4]
-        faces = faces[:, :, :3]
+        # Divide X Y Z by W and discard W.
+        faces = faces[:, :, :3] / faces[:, :, 3:4]
 
         # Apply viewport transform to X and Y.
         faces[:, :, 0:1] = (1.0 + faces[:, :, 0:1]) * viewport.width / 2
@@ -113,25 +111,27 @@ class Engine:
         face_indices = np.argsort(z_centroids)
         faces = faces[face_indices]
 
-        # Compute the winding direction of each polygon, determine its
-        # style, and add it to the group. If the returned style is None,
-        # cull away the polygon.
+        # Compute the winding direction of each polygon.
+        windings = np.zeros(faces.shape[0])
+        if faces.shape[1] >= 3:
+            p0 = faces[:, 0, :]
+            p1 = faces[:, 1, :]
+            p2 = faces[:, 2, :]
+            normals = np.cross(p2 - p0, p1 - p0)
+            np.copyto(windings, normals[:, 2])
+
+        # Determine the style for each polygon and add it to the group.
         group = drawing.g(**default_style)
-        face_index = 0
-        for face in faces:
-            winding = 0
-            if len(face) >= 3:
-                p0, p1, p2 = face[0], face[1], face[2]
-                winding = pyrr.vector3.cross(p2 - p0, p1 - p0)[2]
-            style = shader(face_indices[face_index], winding)
+        for face_index, face in enumerate(faces):
+            style = shader(face_indices[face_index], windings[face_index])
+            if style is None:
+                continue
             face = np.around(face, self.precision)
-            if style != None:
-                if mesh.circle_radius == 0:
-                    group.add(drawing.polygon(face[:, 0:2], **style))
-                else:
-                    for pt in face:
-                        group.add(drawing.circle(pt[0:2], mesh.circle_radius, **style))
-            face_index = face_index + 1
+            if mesh.circle_radius == 0:
+                group.add(drawing.polygon(face[:, 0:2], **style))
+                continue
+            for pt in face:
+                group.add(drawing.circle(pt[0:2], mesh.circle_radius, **style))
 
         return group
 
