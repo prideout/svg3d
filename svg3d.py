@@ -88,8 +88,8 @@ class Engine:
         w = faces[:, :, 3:4]
         xy = faces[:, :, 0:2]
         accepted = np.logical_and(np.greater(xy, -w), np.less(xy, +w))
-        accepted = np.any(accepted, 2)  # vert is accepted if x or y or z are inside
-        accepted = np.any(accepted, 1)  # face is accepted if any vert are inside
+        accepted = np.all(accepted, 2)  # vert is accepted if xyz are all inside
+        accepted = np.any(accepted, 1)  # face is accepted if any vert is inside
         degenerate = np.less_equal(w, 0)[:, :, 0]  # vert is bad if its w <= 0
         degenerate = np.any(degenerate, 1)  # face is bad if any of its verts are bad
         accepted = np.logical_and(accepted, np.logical_not(degenerate))
