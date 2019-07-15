@@ -100,7 +100,7 @@ def generate_overlapping_triangles():
 
 def generate_octahedra():
     view = create_lookat(eye=[-15, -60, 120], target=[0, 0, 0], up=[0, 1, 0])
-    projection = create_perspective(fovy=15, aspect=1, near=10, far=100)
+    projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
     camera = svg3d.Camera(view, projection)
 
     verts, faces = icosahedron()
@@ -318,7 +318,7 @@ def mobius_tube(u, v):
 
 
 view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
-projection = create_perspective(fovy=15, aspect=1, near=10, far=100)
+projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
 camera = svg3d.Camera(view, projection)
 thin_style = dict(
     fill="white",
@@ -371,7 +371,7 @@ sphere_view = svg3d.View(
 )
 
 klein_view = create_lookat(eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1])
-klein_projection = create_perspective(fovy=28, aspect=1, near=10, far=100)
+klein_projection = create_perspective(fovy=28, aspect=1, near=10, far=200)
 klein_camera = svg3d.Camera(klein_view, klein_projection)
 
 faces = 3.0 * parametric_surface(slices, stacks, klein)
@@ -385,7 +385,7 @@ svg3d.Engine([sphere_view, klein_view]).render(
 
 # Create projection for the more complex scenes.
 
-projection = create_perspective(fovy=25, aspect=1, near=10, far=100)
+projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
 view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
 camera = svg3d.Camera(view, projection)
 
@@ -542,7 +542,7 @@ thin = dict(
 )
 
 view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
-projection = create_perspective(fovy=15, aspect=1, near=10, far=100)
+projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
 camera = svg3d.Camera(view, projection)
 
 viewport0 = svg3d.Viewport.from_string("-2.5 -0.5 1.0 1.0")

@@ -17,8 +17,8 @@ def get_octahedron_faces():
     return 15.0 * verts[triangles]
 
 def generate_svg(filename):
-    view = pyrr.matrix44.create_look_at(eye=[50, -40, 120], target=[0, 0, 0], up=[0, 1, 0])
-    projection = pyrr.matrix44.create_perspective_projection(fovy=15, aspect=1, near=10, far=100)
+    view = pyrr.matrix44.create_look_at(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
+    projection = pyrr.matrix44.create_perspective_projection(fovy=15, aspect=1, near=10, far=200)
     camera = svg3d.Camera(view, projection)
 
     style = dict(

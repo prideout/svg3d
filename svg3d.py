@@ -85,9 +85,8 @@ class Engine:
         faces = np.dot(faces, projection)
 
         # Reject trivially clipped polygons.
-        w = faces[:, :, 3:4]
-        xy = faces[:, :, 0:2]
-        accepted = np.logical_and(np.greater(xy, -w), np.less(xy, +w))
+        xyz, w = faces[:, :, :3], faces[:, :, 3:]
+        accepted = np.logical_and(np.greater(xyz, -w), np.less(xyz, +w))
         accepted = np.all(accepted, 2)  # vert is accepted if xyz are all inside
         accepted = np.any(accepted, 1)  # face is accepted if any vert is inside
         degenerate = np.less_equal(w, 0)[:, :, 0]  # vert is bad if its w <= 0
@@ -95,8 +94,9 @@ class Engine:
         accepted = np.logical_and(accepted, np.logical_not(degenerate))
         faces = np.compress(accepted, faces, axis=0)
 
-        # Divide X Y Z by W and discard W.
-        faces = faces[:, :, :3] / faces[:, :, 3:4]
+        # Apply perspective transformation.
+        xyz, w = faces[:, :, :3], faces[:, :, 3:]
+        faces = xyz / w
 
         # Sort faces from back to front.
         face_indices = self._sort_back_to_front(faces)
