@@ -98,18 +98,15 @@ class Engine:
         # Divide X Y Z by W and discard W.
         faces = faces[:, :, :3] / faces[:, :, 3:4]
 
+        # Sort faces from back to front.
+        face_indices = self._sort_back_to_front(faces)
+        faces = faces[face_indices]
+
         # Apply viewport transform to X and Y.
         faces[:, :, 0:1] = (1.0 + faces[:, :, 0:1]) * viewport.width / 2
         faces[:, :, 1:2] = (1.0 - faces[:, :, 1:2]) * viewport.height / 2
         faces[:, :, 0:1] += viewport.minx
         faces[:, :, 1:2] += viewport.miny
-
-        # Sort faces from back to front.
-        z_centroids = -np.sum(faces[:, :, 2], axis=1)
-        for face_index in range(len(z_centroids)):
-            z_centroids[face_index] /= len(faces[face_index])
-        face_indices = np.argsort(z_centroids)
-        faces = faces[face_indices]
 
         # Compute the winding direction of each polygon.
         windings = np.zeros(faces.shape[0])
@@ -134,6 +131,12 @@ class Engine:
                 group.add(drawing.circle(pt[0:2], mesh.circle_radius, **style))
 
         return group
+
+    def _sort_back_to_front(self, faces):
+        z_centroids = -np.sum(faces[:, :, 2], axis=1)
+        for face_index in range(len(z_centroids)):
+            z_centroids[face_index] /= len(faces[face_index])
+        return np.argsort(z_centroids)
 
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
