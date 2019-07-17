@@ -115,18 +115,29 @@ class Engine:
             normals = np.cross(p2 - p0, p1 - p0)
             np.copyto(windings, normals[:, 2])
 
-        # Determine the style for each polygon and add it to the group.
         group = drawing.g(**default_style)
+
+        # Create circles.
+        if mesh.circle_radius > 0:
+            for face_index, face in enumerate(faces):
+                style = shader(face_indices[face_index], 0)
+                if style is None:
+                    continue
+                face = np.around(face[:, :2], self.precision)
+                for pt in face:
+                    group.add(drawing.circle(pt, mesh.circle_radius, **style))
+            return group
+
+        # Create polygons and lines.
         for face_index, face in enumerate(faces):
             style = shader(face_indices[face_index], windings[face_index])
             if style is None:
                 continue
-            face = np.around(face, self.precision)
-            if mesh.circle_radius == 0:
-                group.add(drawing.polygon(face[:, 0:2], **style))
-                continue
-            for pt in face:
-                group.add(drawing.circle(pt[0:2], mesh.circle_radius, **style))
+            face = np.around(face[:, :2], self.precision)
+            if len(face) == 2:
+                group.add(drawing.line(face[0], face[1], **style))
+            else:
+                group.add(drawing.polygon(face, **style))
 
         return group
 
