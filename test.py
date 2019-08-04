@@ -12,24 +12,12 @@ create_ortho = pyrr.matrix44.create_orthogonal_projection
 create_perspective = pyrr.matrix44.create_perspective_projection
 create_lookat = pyrr.matrix44.create_look_at
 
-# x and y specify the center of a picking region in window coordinates
-# width and height specify the size of the picking region in window coordinates
-# viewport is what's returned by glGetIntegerv(GL_VIEWPORT, ...)
-def pick_matrix(x, y, width, height, viewport):
-    sx = viewport.width / width
-    sy = viewport.height / height
-    tx = (viewport.width + 2.0 * (viewport.minx - x)) / width
-    ty = (viewport.height + 2.0 * (viewport.miny - y)) / height
-    return np.transpose(
-        np.float32(
-            [
-                [sx, 0.0, 0.0, tx],
-                [0.0, sy, 0.0, ty],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0],
-            ]
-        )
-    )
+
+def main():
+    create_simple_shapes()
+    create_complex_shapes()
+    generate_octahedra()
+    generate_overlapping_triangles()
 
 
 def generate_overlapping_triangles():
@@ -317,275 +305,271 @@ def mobius_tube(u, v):
     return x, y, z
 
 
-view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
-projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
-camera = svg3d.Camera(view, projection)
-thin_style = dict(
-    fill="white",
-    stroke="black",
-    stroke_linejoin="round",
-    fill_opacity="0.75",
-    stroke_width="0.002",
-)
-thick_style = dict(
-    fill="white",
-    stroke="black",
-    stroke_linejoin="round",
-    fill_opacity="0.75",
-    stroke_width="0.005",
-)
-
-left_viewport = svg3d.Viewport.from_string("-1.0 -0.5 1.0 1.0")
-right_viewport = svg3d.Viewport.from_string("0.0 -0.5 1.0 1.0")
-
-# Octahedron
-
-style = dict(
-    fill="white",
-    fill_opacity="0.75",
-    stroke="black",
-    stroke_linejoin="round",
-    stroke_width="0.005",
-)
-mesh = svg3d.Mesh(15.0 * octahedron(), style=style)
-view = svg3d.View(camera, svg3d.Scene([mesh]))
-svg3d.Engine([view]).render("octahedron.svg")
-
-# Sphere and Klein
-
-
-def shader(face_index, winding):
-    return dict(
+def create_simple_shapes():
+    view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
+    projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
+    camera = svg3d.Camera(view, projection)
+    thin_style = dict(
         fill="white",
-        fill_opacity="0.75",
         stroke="black",
         stroke_linejoin="round",
+        fill_opacity="0.75",
         stroke_width="0.002",
     )
-
-
-slices, stacks = 32, 32
-faces = 15.0 * parametric_surface(slices, stacks, sphere)
-sphere_view = svg3d.View(
-    camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), left_viewport
-)
-
-klein_view = create_lookat(eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1])
-klein_projection = create_perspective(fovy=28, aspect=1, near=10, far=200)
-klein_camera = svg3d.Camera(klein_view, klein_projection)
-
-faces = 3.0 * parametric_surface(slices, stacks, klein)
-klein_view = svg3d.View(
-    klein_camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), right_viewport
-)
-
-svg3d.Engine([sphere_view, klein_view]).render(
-    "sphere_and_klein.svg", (512, 256), "-1.0 -0.5 2.0 1.0"
-)
-
-# Create projection for the more complex scenes.
-
-projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
-view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
-camera = svg3d.Camera(view, projection)
-
-# Parametric Sphere
-
-slices, stacks, radius = 64, 64, 12
-faces = radius * parametric_surface(slices, stacks, sphere)
-
-antialiasing = "auto"  # use 'crispEdges' to fix cracks
-
-
-def shader(face_index, winding):
-    slice = int(face_index / 64)
-    stack = int(face_index % 64)
-    if slice % 3 == 0 or stack % 3 == 0:
-        return dict(
-            fill="black",
-            fill_opacity="1.0",
-            stroke="none",
-            shape_rendering=antialiasing,
-        )
-    return dict(
-        fill="white", fill_opacity="0.75", stroke="none", shape_rendering=antialiasing
-    )
-
-
-scene = svg3d.Scene([svg3d.Mesh(faces, shader)])
-svg3d.Engine([svg3d.View(camera, scene)]).render("parametric_sphere.svg")
-
-# Sphere Shell
-
-verts, faces = icosahedron()
-verts, faces = subdivide(verts, faces)
-verts, faces = subdivide(verts, faces)
-verts, faces = np.float32(verts), np.int32(faces)
-faces = verts[faces]
-
-
-def backface_shader(face_index, winding):
-    if winding >= 0:
-        return None
-    return dict(
-        fill="#7f7fff",
-        fill_opacity="1.0",
+    thick_style = dict(
+        fill="white",
         stroke="black",
         stroke_linejoin="round",
-        stroke_width="0.001",
-        stroke_dasharray="0.01",
+        fill_opacity="0.75",
+        stroke_width="0.005",
     )
 
+    left_viewport = svg3d.Viewport.from_string("-1.0 -0.5 1.0 1.0")
+    right_viewport = svg3d.Viewport.from_string("0.0 -0.5 1.0 1.0")
 
-def frontface_shader(face_index, winding):
-    if winding < 0 or faces[face_index][0][2] > 0.9:
-        return None
-    return dict(
-        fill="#7fff7f",
-        fill_opacity="0.6",
-        stroke="black",
-        stroke_linejoin="round",
-        stroke_width="0.003",
-    )
+    # Octahedron
 
-
-scene = svg3d.Scene([])
-scene.add_mesh(svg3d.Mesh(12.0 * faces, backface_shader))
-scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
-svg3d.Engine([svg3d.View(camera, scene)]).render("sphere_shell.svg")
-
-# Sphere Lighting
-
-ones = np.ones(faces.shape[:2] + (1,))
-eyespace_faces = np.dstack([faces, ones])
-eyespace_faces = np.dot(eyespace_faces, view)[:, :, :3]
-shininess = 100
-L = pyrr.vector.normalize(np.float32([20, 20, 50]))
-E = np.float32([0, 0, 1])
-H = pyrr.vector.normalize(L + E)
-
-
-def frontface_shader(face_index, winding):
-    if winding < 0:
-        return None
-    face = eyespace_faces[face_index]
-    p0, p1, p2 = face[0], face[1], face[2]
-    N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
-    df = max(0, np.dot(N, L))
-    sf = pow(max(0, np.dot(N, H)), shininess)
-    color = df * np.float32([1, 1, 0]) + sf * np.float32([1, 1, 1])
-    color = np.power(color, 1.0 / 2.2)
-    return dict(
-        fill=rgb(*color), fill_opacity="1.0", stroke="black", stroke_width="0.001"
-    )
-
-
-scene = svg3d.Scene([])
-scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
-svg3d.Engine([svg3d.View(camera, scene)]).render("sphere_lighting.svg")
-
-# Mobius Tube
-
-slices, stacks, radius = 48, 32, 7
-faces = radius * parametric_surface(slices, stacks, mobius_tube)
-
-ones = np.ones(faces.shape[:2] + (1,))
-eyespace_faces = np.dstack([faces, ones])
-eyespace_faces = np.dot(eyespace_faces, view)[:, :, :3]
-shininess = 75
-L = pyrr.vector.normalize(np.float32([10, -10, 50]))
-E = np.float32([0, 0, 1])
-H = pyrr.vector.normalize(L + E)
-
-
-def frontface_shader(face_index, winding):
-    if winding < 0:
-        return None
-    face = eyespace_faces[face_index]
-    p0, p1, p2 = face[0], face[1], face[2]
-    N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
-    df = max(0, np.dot(N, L))
-    sf = pow(max(0, np.dot(N, H)), shininess)
-    color = df * np.float32([0, 0.8, 1]) + sf * np.float32([1, 1, 1])
-    color = np.power(color, 1.0 / 2.2)
-    return dict(
-        fill=rgb(*color),
-        fill_opacity="1.0",
-        stroke=rgb(*(color * 1.5)),
-        stroke_width="0.001",
-    )
-
-
-scene = svg3d.Scene([])
-scene.add_mesh(svg3d.Mesh(faces, frontface_shader))
-svg3d.Engine([svg3d.View(camera, scene)]).render("mobius_tube.svg")
-
-# Filmstrip
-
-
-def shader(face_index, winding):
-    return dict(
+    style = dict(
         fill="white",
         fill_opacity="0.75",
         stroke="black",
         stroke_linejoin="round",
         stroke_width="0.005",
     )
+    mesh = svg3d.Mesh(15.0 * octahedron(), style=style)
+    view = svg3d.View(camera, svg3d.Scene([mesh]))
+    svg3d.Engine([view]).render("octahedron.svg")
+
+    # Sphere and Klein
+
+    def shader(face_index, winding):
+        return dict(
+            fill="white",
+            fill_opacity="0.75",
+            stroke="black",
+            stroke_linejoin="round",
+            stroke_width="0.002",
+        )
+
+    slices, stacks = 32, 32
+    faces = 15.0 * parametric_surface(slices, stacks, sphere)
+    sphere_view = svg3d.View(
+        camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), left_viewport
+    )
+
+    klein_view = create_lookat(eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1])
+    klein_projection = create_perspective(fovy=28, aspect=1, near=10, far=200)
+    klein_camera = svg3d.Camera(klein_view, klein_projection)
+
+    faces = 3.0 * parametric_surface(slices, stacks, klein)
+    klein_view = svg3d.View(
+        klein_camera, svg3d.Scene([svg3d.Mesh(faces, shader)]), right_viewport
+    )
+
+    svg3d.Engine([sphere_view, klein_view]).render(
+        "sphere_and_klein.svg", (512, 256), "-1.0 -0.5 2.0 1.0"
+    )
 
 
-thin = dict(
-    fill="white",
-    fill_opacity="0.75",
-    stroke="black",
-    stroke_linejoin="round",
-    stroke_width="0.001",
-)
+def create_complex_shapes():
+    projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
+    view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+    camera = svg3d.Camera(view, projection)
 
-view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
-projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
-camera = svg3d.Camera(view, projection)
+    # Parametric Sphere
 
-viewport0 = svg3d.Viewport.from_string("-2.5 -0.5 1.0 1.0")
-viewport1 = svg3d.Viewport.from_string("-1.5 -0.5 1.0 1.0")
-viewport2 = svg3d.Viewport.from_string("-0.5 -0.5 1.0 1.0")
-viewport3 = svg3d.Viewport.from_string(" 0.5 -0.5 1.0 1.0")
-viewport4 = svg3d.Viewport.from_string(" 1.5 -0.5 1.0 1.0")
+    slices, stacks, radius = 64, 64, 12
+    faces = radius * parametric_surface(slices, stacks, sphere)
 
-slices, stacks = 24, 32
-sphere_faces = 15.0 * parametric_surface(slices, stacks, sphere)
+    antialiasing = "auto"  # use 'crispEdges' to fix cracks
 
-slices, stacks = 32, 24
-klein_faces = 3.0 * parametric_surface(slices, stacks, klein)
+    def shader(face_index, winding):
+        slice = int(face_index / 64)
+        stack = int(face_index % 64)
+        if slice % 3 == 0 or stack % 3 == 0:
+            return dict(
+                fill="black",
+                fill_opacity="1.0",
+                stroke="none",
+                shape_rendering=antialiasing,
+            )
+        return dict(
+            fill="white",
+            fill_opacity="0.75",
+            stroke="none",
+            shape_rendering=antialiasing,
+        )
 
-slices, stacks, radius = 48, 32, 7
-mobius_faces = radius * parametric_surface(slices, stacks, mobius_tube)
+    scene = svg3d.Scene([svg3d.Mesh(faces, shader)])
+    svg3d.Engine([svg3d.View(camera, scene)]).render("parametric_sphere.svg")
 
-# cube
-view0 = svg3d.View(camera, svg3d.Scene([svg3d.Mesh(cube(), shader)]), viewport0)
+    # Sphere Shell
 
-# octahedron
-view1 = svg3d.View(
-    camera, svg3d.Scene([svg3d.Mesh(12.0 * octahedron(), shader)]), viewport1
-)
+    verts, faces = icosahedron()
+    verts, faces = subdivide(verts, faces)
+    verts, faces = subdivide(verts, faces)
+    verts, faces = np.float32(verts), np.int32(faces)
+    faces = verts[faces]
 
-# sphere
-view2 = svg3d.View(
-    camera, svg3d.Scene([svg3d.Mesh(sphere_faces, style=thin)]), viewport2
-)
+    def backface_shader(face_index, winding):
+        if winding >= 0:
+            return None
+        return dict(
+            fill="#7f7fff",
+            fill_opacity="1.0",
+            stroke="black",
+            stroke_linejoin="round",
+            stroke_width="0.001",
+            stroke_dasharray="0.01",
+        )
 
-# klein
-view3 = svg3d.View(
-    klein_camera, svg3d.Scene([svg3d.Mesh(klein_faces, style=thin)]), viewport3
-)
+    def frontface_shader(face_index, winding):
+        if winding < 0 or faces[face_index][0][2] > 0.9:
+            return None
+        return dict(
+            fill="#7fff7f",
+            fill_opacity="0.6",
+            stroke="black",
+            stroke_linejoin="round",
+            stroke_width="0.003",
+        )
 
-# mobius
-view4 = svg3d.View(
-    camera, svg3d.Scene([svg3d.Mesh(mobius_faces, frontface_shader)]), viewport4
-)
+    scene = svg3d.Scene([])
+    scene.add_mesh(svg3d.Mesh(12.0 * faces, backface_shader))
+    scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
+    svg3d.Engine([svg3d.View(camera, scene)]).render("sphere_shell.svg")
 
-drawing = svgwrite.Drawing("filmstrip.svg", (256 * 5, 256), viewBox="-2.5 -0.5 5.0 1.0")
-svg3d.Engine([view0, view1, view2, view3, view4]).render_to_drawing(drawing)
-drawing.save()
+    # Sphere Lighting
 
-generate_octahedra()
-generate_overlapping_triangles()
+    ones = np.ones(faces.shape[:2] + (1,))
+    eyespace_faces = np.dstack([faces, ones])
+    eyespace_faces = np.dot(eyespace_faces, view)[:, :, :3]
+    shininess = 100
+    L = pyrr.vector.normalize(np.float32([20, 20, 50]))
+    E = np.float32([0, 0, 1])
+    H = pyrr.vector.normalize(L + E)
+
+    def frontface_shader(face_index, winding):
+        if winding < 0:
+            return None
+        face = eyespace_faces[face_index]
+        p0, p1, p2 = face[0], face[1], face[2]
+        N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
+        df = max(0, np.dot(N, L))
+        sf = pow(max(0, np.dot(N, H)), shininess)
+        color = df * np.float32([1, 1, 0]) + sf * np.float32([1, 1, 1])
+        color = np.power(color, 1.0 / 2.2)
+        return dict(
+            fill=rgb(*color), fill_opacity="1.0", stroke="black", stroke_width="0.001"
+        )
+
+    scene = svg3d.Scene([])
+    scene.add_mesh(svg3d.Mesh(12.0 * faces, frontface_shader))
+    svg3d.Engine([svg3d.View(camera, scene)]).render("sphere_lighting.svg")
+
+    # Mobius Tube
+
+    slices, stacks, radius = 48, 32, 7
+    faces = radius * parametric_surface(slices, stacks, mobius_tube)
+
+    ones = np.ones(faces.shape[:2] + (1,))
+    eyespace_faces = np.dstack([faces, ones])
+    eyespace_faces = np.dot(eyespace_faces, view)[:, :, :3]
+    shininess = 75
+    L = pyrr.vector.normalize(np.float32([10, -10, 50]))
+    E = np.float32([0, 0, 1])
+    H = pyrr.vector.normalize(L + E)
+
+    def frontface_shader(face_index, winding):
+        if winding < 0:
+            return None
+        face = eyespace_faces[face_index]
+        p0, p1, p2 = face[0], face[1], face[2]
+        N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
+        df = max(0, np.dot(N, L))
+        sf = pow(max(0, np.dot(N, H)), shininess)
+        color = df * np.float32([0, 0.8, 1]) + sf * np.float32([1, 1, 1])
+        color = np.power(color, 1.0 / 2.2)
+        return dict(
+            fill=rgb(*color),
+            fill_opacity="1.0",
+            stroke=rgb(*(color * 1.5)),
+            stroke_width="0.001",
+        )
+
+    scene = svg3d.Scene([])
+    scene.add_mesh(svg3d.Mesh(faces, frontface_shader))
+    svg3d.Engine([svg3d.View(camera, scene)]).render("mobius_tube.svg")
+
+    # Filmstrip
+
+    def shader(face_index, winding):
+        return dict(
+            fill="white",
+            fill_opacity="0.75",
+            stroke="black",
+            stroke_linejoin="round",
+            stroke_width="0.005",
+        )
+
+    thin = dict(
+        fill="white",
+        fill_opacity="0.75",
+        stroke="black",
+        stroke_linejoin="round",
+        stroke_width="0.001",
+    )
+
+    view = create_lookat(eye=[50, 40, 120], target=[0, 0, 0], up=[0, 1, 0])
+    projection = create_perspective(fovy=15, aspect=1, near=10, far=200)
+    camera = svg3d.Camera(view, projection)
+
+    viewport0 = svg3d.Viewport.from_string("-2.5 -0.5 1.0 1.0")
+    viewport1 = svg3d.Viewport.from_string("-1.5 -0.5 1.0 1.0")
+    viewport2 = svg3d.Viewport.from_string("-0.5 -0.5 1.0 1.0")
+    viewport3 = svg3d.Viewport.from_string(" 0.5 -0.5 1.0 1.0")
+    viewport4 = svg3d.Viewport.from_string(" 1.5 -0.5 1.0 1.0")
+
+    slices, stacks = 24, 32
+    sphere_faces = 15.0 * parametric_surface(slices, stacks, sphere)
+
+    slices, stacks = 32, 24
+    klein_faces = 3.0 * parametric_surface(slices, stacks, klein)
+
+    slices, stacks, radius = 48, 32, 7
+    mobius_faces = radius * parametric_surface(slices, stacks, mobius_tube)
+
+    # cube
+    view0 = svg3d.View(camera, svg3d.Scene([svg3d.Mesh(cube(), shader)]), viewport0)
+
+    # octahedron
+    view1 = svg3d.View(
+        camera, svg3d.Scene([svg3d.Mesh(12.0 * octahedron(), shader)]), viewport1
+    )
+
+    # sphere
+    view2 = svg3d.View(
+        camera, svg3d.Scene([svg3d.Mesh(sphere_faces, style=thin)]), viewport2
+    )
+
+    # klein
+    klein_view = create_lookat(eye=[50, 120, 50], target=[0, 0, 0], up=[0, 0, 1])
+    klein_projection = create_perspective(fovy=28, aspect=1, near=10, far=200)
+    klein_camera = svg3d.Camera(klein_view, klein_projection)
+    view3 = svg3d.View(
+        klein_camera, svg3d.Scene([svg3d.Mesh(klein_faces, style=thin)]), viewport3
+    )
+
+    # mobius
+    view4 = svg3d.View(
+        camera, svg3d.Scene([svg3d.Mesh(mobius_faces, frontface_shader)]), viewport4
+    )
+
+    drawing = svgwrite.Drawing(
+        "filmstrip.svg", (256 * 5, 256), viewBox="-2.5 -0.5 5.0 1.0"
+    )
+    svg3d.Engine([view0, view1, view2, view3, view4]).render_to_drawing(drawing)
+    drawing.save()
+
+
+main()
