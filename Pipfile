@@ -10,6 +10,7 @@ numpy = "*"
 pyrr = "*"
 svgwrite = "*"
 mypy = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.7"
