@@ -4,6 +4,7 @@ import svg3d
 import pyrr
 import numpy as np
 import svgwrite.utils
+from matplotlib import cm
 
 from math import *
 
@@ -14,10 +15,59 @@ create_lookat = pyrr.matrix44.create_look_at
 
 
 def main():
+    create_surface_plot()
     create_simple_shapes()
     create_complex_shapes()
     generate_octahedra()
     generate_overlapping_triangles()
+
+
+def create_surface_plot():
+
+    divs = 25
+    colormap = cm.ScalarMappable(None, "jet")
+
+    X, Y = np.meshgrid(np.linspace(-2, 2, divs), np.linspace(-2, 2, divs))
+    Z = 2 * X * np.exp(-X * X - Y * Y)
+    verts = np.reshape(np.dstack([X, Y, Z]), [divs * divs, 3])
+
+    i, j = np.mgrid[0 : divs * 2, 0 : divs * 2]
+    coords = np.uint32(np.dstack([i / 2, j / 2]))
+    coords = coords[1 : divs * 2 - 1, 1 : divs * 2 - 1]
+    indices = coords[:, :, 0] * divs + coords[:, :, 1]
+    nw = indices[0::2][:, 0::2]
+    ne = indices[0::2][:, 1::2]
+    sw = indices[1::2][:, 0::2]
+    se = indices[1::2][:, 1::2]
+    indices = np.dstack([nw, ne, se, sw])
+    indices = np.reshape(indices, [(divs - 1) * (divs - 1), 4])
+    faces = verts[indices]
+
+    view = create_lookat(eye=[5, 20, 5], target=[0, 0, 0], up=[0, 0, 1])
+    projection = create_perspective(fovy=15, aspect=1, near=1, far=100)
+    camera = svg3d.Camera(view, projection)
+
+    style = dict(
+        fill="#f0f0f0",
+        fill_opacity="0.75",
+        stroke="black",
+        stroke_linejoin="round",
+        stroke_width="0.001",
+    )
+
+    rgb = colormap.to_rgba(Z)[:, :, :3]
+    colors = np.reshape(rgb, [divs * divs, 3])
+    colors = colors[indices]
+
+    def shader(face_index, winding):
+        face_colors = colors[face_index]
+        rgb = ",".join([str(int(num * 255)) for num in face_colors[0]])
+        style["fill"] = f"rgb({rgb})"
+        return style
+
+    scene = svg3d.Scene([svg3d.Mesh(faces, shader)])
+    view = svg3d.View(camera, scene)
+    svg3d.Engine([view]).render("plot.svg")
 
 
 def generate_overlapping_triangles():
