@@ -4,7 +4,6 @@ import svg3d
 import pyrr
 import numpy as np
 import svgwrite.utils
-from matplotlib import cm
 
 from math import *
 
@@ -22,10 +21,16 @@ def main():
     generate_overlapping_triangles()
 
 
+def apply_turbo_colormap(x):
+    x = np.clip(0.5 * (x + 1.0), 0, 1)
+    r = 34.61 + x * (1172.33 - x * (10793.56 - x * (33300.12 - x * (38394.49 - x * 14825.05))))
+    g = 23.31 + x * (557.33 + x * (1225.33 - x * (3574.96 - x * (1073.77 + x * 707.56))))
+    b = 27.2 + x * (3211.1 - x * (15327.97 - x * (27814 - x * (22569.18 - x * 6838.66))))
+    return np.dstack([r, g, b]) / 255.0
+
 def create_surface_plot():
 
     divs = 25
-    colormap = cm.ScalarMappable(None, "jet")
 
     X, Y = np.meshgrid(np.linspace(-2, 2, divs), np.linspace(-2, 2, divs))
     Z = 2 * X * np.exp(-X * X - Y * Y)
@@ -55,7 +60,7 @@ def create_surface_plot():
         stroke_width="0.001",
     )
 
-    rgb = colormap.to_rgba(Z)[:, :, :3]
+    rgb = apply_turbo_colormap(Z)
     colors = np.reshape(rgb, [divs * divs, 3])
     colors = colors[indices]
 
@@ -121,7 +126,6 @@ def generate_overlapping_triangles():
     )
 
     poly_style = dict(
-        # fill="red",
         fill="#e0e0e0",
         fill_opacity="0.75",
         stroke="black",
