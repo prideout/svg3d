@@ -94,6 +94,18 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                     d = boundary_b[i+1]
                     connectors.append([d, b, a])
                     connectors.append([a, c, d])
+            # Connect top patch to bottom patch
+            for patch in range(4):
+                next_patch = 4 + (4 - patch) % 4
+                boundary_a = boundaries[2] + num_verts * patch
+                boundary_b = boundaries[1] + num_verts * next_patch
+                for i in range(n-1):
+                    a = boundary_a[i]
+                    b = boundary_b[n-1-i]
+                    c = boundary_a[i+1]
+                    d = boundary_b[n-1-i-1]
+                    connectors.append([a, b, d])
+                    connectors.append([d, c, a])
 
         # Top hole
         a = boundaries[0][-1]
@@ -111,33 +123,23 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         connectors.append([a, b, c])
         connectors.append([c, d, a])
 
-        # Connect top patch to bottom patch
+        # Side holes
         squares = []
         for patch in range(4):
             next_patch = 4 + (4 - patch) % 4
             boundary_a = boundaries[2] + num_verts * patch
             boundary_b = boundaries[1] + num_verts * next_patch
-            if radius > 0:
-                for i in range(n-1):
-                    a = boundary_a[i]
-                    b = boundary_b[n-1-i]
-                    c = boundary_a[i+1]
-                    d = boundary_b[n-1-i-1]
-                    connectors.append([a, b, d])
-                    connectors.append([d, c, a])
             a = boundary_a[0]
             b = boundary_b[n-1]
             squares.append([a, b])
             a = boundary_a[n-1]
             b = boundary_b[0]
             squares.append([a, b])
-
         def emit_square(i, j):
             a, b = squares[i]
             c, d = squares[j]
             connectors.append([a, b, d])
             connectors.append([d, c, a])
-
         emit_square(7, 0)
         emit_square(1, 2)
         emit_square(3, 4)
@@ -284,19 +286,19 @@ if __name__ == "__main__":
     vp = svg3d.Viewport(-1, -.5, 2, 1)
     engine = svg3d.Engine([])
 
+    mesh = make_octaspheres(ndivisions=2, radius=8)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere3.svg", size=SIZE)
+
+    mesh = make_octaspheres(ndivisions=3, radius=7, width=16, height=16, depth=16)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere1.svg", size=SIZE)
+
+    mesh = make_octaspheres(ndivisions=0, radius=7, width=16, height=16, depth=16)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere2.svg", size=SIZE)
+
     if False:
-        mesh = make_octaspheres(ndivisions=3, radius=7, width=16, height=16, depth=16)
-        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-        engine.render("octasphere1.svg", size=SIZE)
-
-        mesh = make_octaspheres(ndivisions=0, radius=7, width=16, height=16, depth=16)
-        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-        engine.render("octasphere2.svg", size=SIZE)
-
-        mesh = make_octaspheres(ndivisions=2, radius=8)
-        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-        engine.render("octasphere3.svg", size=SIZE)
-
         mesh = make_octaspheres(ndivisions=5, radius=3, width=12, height=12, depth=12)
         engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
         engine.render("octasphere4.svg", size=SIZE)
