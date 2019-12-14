@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import svg3d
+from parent_folder import svg3d
 import pyrr
 import numpy as np
 import svgwrite.utils

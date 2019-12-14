@@ -41,6 +41,6 @@ The above code snippet generates an image like this:
 ```
 pipenv shell
 pipenv install
-./test.py
-open gallery.html
+extras/test.py
+open extras/gallery.html
 ```
