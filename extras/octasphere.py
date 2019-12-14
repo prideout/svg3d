@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 
 """
-TODO
-- move to /extras in svg3d
-- parameterize properly, create filmstrip test with various cam angles, pre-alloc all numpy arrays
+TODO: pre-alloc all numpy arrays
 """
 
 import numpy as np
@@ -13,12 +11,17 @@ from math import *
 
 quaternion = pyrr.quaternion
 
-def octasphere(ndivisions: int, radius: float, explosion: float):
+def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     "Returns a vertex and index array for a subdivided octahedron."
+    r2 = 2 * radius
+    width = max(width, r2)
+    height = max(height, r2)
+    depth = max(depth, r2)
     n = 2**ndivisions + 1
     num_verts = n * (n + 1) // 2
     verts = []
-    translation = np.float32([explosion, explosion, explosion])
+    translation = np.float32([width-r2, height-r2, depth-r2])
+    print(translation)
     for i in range(n):
         theta = pi * 0.5 * i / (n - 1)
         point_a = [0, sin(theta), cos(theta)]
@@ -62,7 +65,7 @@ def octasphere(ndivisions: int, radius: float, explosion: float):
         combined_faces.append(rotated_faces)
         offset = offset + len(verts)
 
-    if explosion > 0.0:
+    if np.any(translation):
         boundaries = get_boundary_indices(ndivisions)
         connectors = []
 
@@ -226,7 +229,7 @@ if __name__ == "__main__":
     def merge_faces(faces0, faces1):
         return np.vstack([faces0, faces1])
 
-    verts, indices = octasphere(3, 7, 3.0)
+    verts, indices = octasphere(3, 7, 16, 16, 16)
     faces = verts[indices]
 
     left = translate_faces(faces, [ -12, 0, 0])
