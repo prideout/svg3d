@@ -212,12 +212,30 @@ if __name__ == "__main__":
         b = max(0.0, min(b, 1.0))
         return svgwrite.utils.rgb(r * 255, g * 255, b * 255)
 
-    projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
-    view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
-    camera = svg3d.Camera(view, projection)
+    def rotate_faces(faces):
+        q = quaternion.create_from_eulers([pi * -0.4, pi * 0.9, 0])
+        new_faces = []
+        for f in faces:
+            verts = [quaternion.apply_to_vector(q, v) for v in f]
+            new_faces.append(verts)
+        return np.float32(new_faces)
+
+    def translate_faces(faces, offset):
+        return faces + np.float32(offset)
+
+    def merge_faces(faces0, faces1):
+        return np.vstack([faces0, faces1])
 
     verts, indices = octasphere(3, 7, 3.0)
     faces = verts[indices]
+
+    left = translate_faces(faces, [ -12, 0, 0])
+    right = translate_faces(rotate_faces(faces), [ 12, 0, 0])
+    faces = merge_faces(left, right)
+
+    projection = create_perspective(fovy=25, aspect=2, near=10, far=200)
+    view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+    camera = svg3d.Camera(view, projection)
 
     ones = np.ones(faces.shape[:2] + (1,))
     eyespace_faces = np.dstack([faces, ones])
@@ -240,5 +258,6 @@ if __name__ == "__main__":
 
     meshes = [svg3d.Mesh(faces, frontface_shader)]
     scene = svg3d.Scene(meshes)
-    engine = svg3d.Engine([svg3d.View(camera, scene)])
+    vp = svg3d.Viewport(-1, -.5, 2, 1)
+    engine = svg3d.Engine([svg3d.View(camera, scene, vp)])
     engine.render("octasphere.svg", size=SIZE)
