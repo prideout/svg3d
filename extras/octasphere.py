@@ -131,19 +131,17 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
             boundary_b = boundaries[1] + num_verts * next_patch
             a = boundary_a[0]
             b = boundary_b[n-1]
+            c = boundary_a[n-1]
+            d = boundary_b[0]
             squares.append([a, b])
-            a = boundary_a[n-1]
-            b = boundary_b[0]
-            squares.append([a, b])
-        def emit_square(i, j):
+            squares.append([c, d])
+        side_patches = [(7,0),(1,2),(3,4),(5,6)]
+        for pair in side_patches:
+            i, j = pair
             a, b = squares[i]
             c, d = squares[j]
             connectors.append([a, b, d])
             connectors.append([d, c, a])
-        emit_square(7, 0)
-        emit_square(1, 2)
-        emit_square(3, 4)
-        emit_square(5, 6)
 
         if radius == 0:
             assert len(connectors) // 2 == 6
