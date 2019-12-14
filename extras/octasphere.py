@@ -20,8 +20,10 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     n = 2**ndivisions + 1
     num_verts = n * (n + 1) // 2
     verts = []
-    translation = np.float32([width-r2, height-r2, depth-r2])
-    print(translation)
+    tx = (width - r2) / 2
+    ty = (height - r2) / 2
+    tz = (depth - r2) / 2
+    translation = np.float32([tx, ty, tz])
     for i in range(n):
         theta = pi * 0.5 * i / (n - 1)
         point_a = [0, sin(theta), cos(theta)]
@@ -229,38 +231,64 @@ if __name__ == "__main__":
     def merge_faces(faces0, faces1):
         return np.vstack([faces0, faces1])
 
-    verts, indices = octasphere(3, 7, 16, 16, 16)
-    faces = verts[indices]
-
-    left = translate_faces(faces, [ -12, 0, 0])
-    right = translate_faces(rotate_faces(faces), [ 12, 0, 0])
-    faces = merge_faces(left, right)
-
     projection = create_perspective(fovy=25, aspect=2, near=10, far=200)
-    view = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
-    camera = svg3d.Camera(view, projection)
+    view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+    camera = svg3d.Camera(view_matrix, projection)
 
-    ones = np.ones(faces.shape[:2] + (1,))
-    eyespace_faces = np.dstack([faces, ones])
-    eyespace_faces = np.dot(eyespace_faces, view)[:, :, :3]
-    L = pyrr.vector.normalize(np.float32([20, 20, 50]))
-    E = np.float32([0, 0, 1])
-    H = pyrr.vector.normalize(L + E)
+    def make_octaspheres(ndivisions: int, radius: float, width=0, height=0, depth=0):
+        verts, indices = octasphere(ndivisions, radius, width, height, depth)
+        faces = verts[indices]
 
-    def frontface_shader(face_index, winding):
-        if winding < 0:
-            return None
-        face = eyespace_faces[face_index]
-        p0, p1, p2 = face[0], face[1], face[2]
-        N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
-        df = max(0, np.dot(N, L))
-        sf = pow(max(0, np.dot(N, H)), SHININESS)
-        color = df * DIFFUSE + sf * SPECULAR
-        color = np.power(color, 1.0 / 2.2)
-        return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
+        left = translate_faces(faces, [ -12, 0, 0])
+        right = translate_faces(rotate_faces(faces), [ 12, 0, 0])
+        faces = merge_faces(left, right)
 
-    meshes = [svg3d.Mesh(faces, frontface_shader)]
-    scene = svg3d.Scene(meshes)
+        ones = np.ones(faces.shape[:2] + (1,))
+        eyespace_faces = np.dstack([faces, ones])
+        eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
+        L = pyrr.vector.normalize(np.float32([20, 20, 50]))
+        E = np.float32([0, 0, 1])
+        H = pyrr.vector.normalize(L + E)
+
+        def frontface_shader(face_index, winding):
+            if winding < 0:
+                return None
+            face = eyespace_faces[face_index]
+            p0, p1, p2 = face[0], face[1], face[2]
+            N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
+            df = max(0, np.dot(N, L))
+            sf = pow(max(0, np.dot(N, H)), SHININESS)
+            color = df * DIFFUSE + sf * SPECULAR
+            color = np.power(color, 1.0 / 2.2)
+            return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
+
+        print(f"Generated octasphere with {ndivisions} subdivisions.")
+        return [svg3d.Mesh(faces, frontface_shader)]
+
     vp = svg3d.Viewport(-1, -.5, 2, 1)
-    engine = svg3d.Engine([svg3d.View(camera, scene, vp)])
-    engine.render("octasphere.svg", size=SIZE)
+    engine = svg3d.Engine([])
+
+    if False:
+        mesh = make_octaspheres(ndivisions=3, radius=7, width=16, height=16, depth=16)
+        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+        engine.render("octasphere1.svg", size=SIZE)
+
+        mesh = make_octaspheres(ndivisions=0, radius=7, width=16, height=16, depth=16)
+        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+        engine.render("octasphere2.svg", size=SIZE)
+
+        mesh = make_octaspheres(ndivisions=2, radius=8)
+        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+        engine.render("octasphere3.svg", size=SIZE)
+
+        mesh = make_octaspheres(ndivisions=5, radius=3, width=12, height=12, depth=12)
+        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+        engine.render("octasphere4.svg", size=SIZE)
+
+        mesh = make_octaspheres(ndivisions=5, radius=1, width=12, height=12, depth=12)
+        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+        engine.render("octasphere5.svg", size=SIZE)
+
+    mesh = make_octaspheres(ndivisions=2, radius=5, width=14, height=14, depth=0)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere6.svg", size=SIZE)
