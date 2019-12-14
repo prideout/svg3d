@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
-"""
-TODO: pre-alloc all numpy arrays
-"""
+"TODO: prealloc all numpy arrays"
 
 import numpy as np
 import pyrr
@@ -30,7 +28,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         point_b = [cos(theta), sin(theta), 0]
         num_segments = n - 1 - i
         geodesic_verts = compute_geodesic(point_a, point_b, num_segments)
-        geodesic_verts = geodesic_verts * radius + translation
+        geodesic_verts = geodesic_verts * radius
         verts = verts + [v for v in geodesic_verts]
     assert len(verts) == num_verts
 
@@ -147,6 +145,16 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         combined_faces.append(connectors)
 
     verts, faces = np.vstack(combined_verts), np.vstack(combined_faces)
+
+    translation = np.float32([
+        [+1, +1, +1], [+1, +1, -1], [-1, +1, -1], [-1, +1, +1],
+        [+1, -1, +1], [-1, -1, +1], [-1, -1, -1], [+1, -1, -1],
+    ]) * translation
+
+    # print(verts.shape, translation.shape)
+    for i in range(0, len(verts), num_verts):
+        verts[i:i+num_verts] += translation[i // num_verts]
+
     return verts, faces
 
 
@@ -255,7 +263,10 @@ if __name__ == "__main__":
                 return None
             face = eyespace_faces[face_index]
             p0, p1, p2 = face[0], face[1], face[2]
-            N = pyrr.vector.normalize(pyrr.vector3.cross(p1 - p0, p2 - p0))
+            N = pyrr.vector3.cross(p1 - p0, p2 - p0)
+            l2 = pyrr.vector3.squared_length(N)
+            if l2 > 0:
+                N = N / np.sqrt(l2)
             df = max(0, np.dot(N, L))
             sf = pow(max(0, np.dot(N, H)), SHININESS)
             color = df * DIFFUSE + sf * SPECULAR
@@ -289,6 +300,6 @@ if __name__ == "__main__":
         engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
         engine.render("octasphere5.svg", size=SIZE)
 
-    mesh = make_octaspheres(ndivisions=2, radius=5, width=14, height=14, depth=0)
+    mesh = make_octaspheres(ndivisions=3, radius=3, width=16, height=16, depth=0)
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere6.svg", size=SIZE)
