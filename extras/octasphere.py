@@ -124,20 +124,28 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         connectors.append([c, d, a])
 
         # Side holes
-        def get_square(patch_index):
+        for i, j in [(7,0),(1,2),(3,4),(5,6)]:
+
+            patch_index = i
             patch = patch_index // 2
             next_patch = 4 + (4 - patch) % 4
             boundary_a = boundaries[2] + num_verts * patch
             boundary_b = boundaries[1] + num_verts * next_patch
             if patch_index % 2 == 0:
-                return boundary_a[0], boundary_b[n-1]
+                a,b = boundary_a[0], boundary_b[n-1]
             else:
-                return boundary_a[n-1], boundary_b[0]
+                a,b = boundary_a[n-1], boundary_b[0]
 
-        side_patches = [(7,0),(1,2),(3,4),(5,6)]
-        for i, j in side_patches:
-            a, b = get_square(i)
-            c, d = get_square(j)
+            patch_index = j
+            patch = patch_index // 2
+            next_patch = 4 + (4 - patch) % 4
+            boundary_a = boundaries[2] + num_verts * patch
+            boundary_b = boundaries[1] + num_verts * next_patch
+            if patch_index % 2 == 0:
+                c,d = boundary_a[0], boundary_b[n-1]
+            else:
+                c,d = boundary_a[n-1], boundary_b[0]
+
             connectors.append([a, b, d])
             connectors.append([d, c, a])
 
@@ -154,7 +162,6 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         [+1, -1, +1], [-1, -1, +1], [-1, -1, -1], [+1, -1, -1],
     ]) * translation
 
-    # print(verts.shape, translation.shape)
     for i in range(0, len(verts), num_verts):
         verts[i:i+num_verts] += translation[i // num_verts]
 
