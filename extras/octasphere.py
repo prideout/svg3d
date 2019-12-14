@@ -69,18 +69,31 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         boundaries = get_boundary_indices(ndivisions)
         connectors = []
 
-        # Top half
-        for patch in range(4):
-            next_patch = (patch + 1) % 4
-            boundary_a = boundaries[1] + num_verts * patch
-            boundary_b = boundaries[0] + num_verts * next_patch
-            for i in range(n-1):
-                a = boundary_a[i]
-                b = boundary_b[i]
-                c = boundary_a[i+1]
-                d = boundary_b[i+1]
-                connectors.append([a, b, d])
-                connectors.append([d, c, a])
+        if radius > 0:
+            # Top half
+            for patch in range(4):
+                next_patch = (patch + 1) % 4
+                boundary_a = boundaries[1] + num_verts * patch
+                boundary_b = boundaries[0] + num_verts * next_patch
+                for i in range(n-1):
+                    a = boundary_a[i]
+                    b = boundary_b[i]
+                    c = boundary_a[i+1]
+                    d = boundary_b[i+1]
+                    connectors.append([a, b, d])
+                    connectors.append([d, c, a])
+            # Bottom half
+            for patch in range(4,8):
+                next_patch = 4 + (patch + 1) % 4
+                boundary_a = boundaries[0] + num_verts * patch
+                boundary_b = boundaries[2] + num_verts * next_patch
+                for i in range(n-1):
+                    a = boundary_a[i]
+                    b = boundary_b[i]
+                    c = boundary_a[i+1]
+                    d = boundary_b[i+1]
+                    connectors.append([d, b, a])
+                    connectors.append([a, c, d])
 
         # Top hole
         a = boundaries[0][-1]
@@ -89,19 +102,6 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         d = c + num_verts
         connectors.append([a, b, c])
         connectors.append([c, d, a])
-
-        # Bottom half
-        for patch in range(4,8):
-            next_patch = 4 + (patch + 1) % 4
-            boundary_a = boundaries[0] + num_verts * patch
-            boundary_b = boundaries[2] + num_verts * next_patch
-            for i in range(n-1):
-                a = boundary_a[i]
-                b = boundary_b[i]
-                c = boundary_a[i+1]
-                d = boundary_b[i+1]
-                connectors.append([d, b, a])
-                connectors.append([a, c, d])
 
         # Bottom hole
         a = boundaries[2][0] + num_verts * 4
@@ -117,13 +117,14 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
             next_patch = 4 + (4 - patch) % 4
             boundary_a = boundaries[2] + num_verts * patch
             boundary_b = boundaries[1] + num_verts * next_patch
-            for i in range(n-1):
-                a = boundary_a[i]
-                b = boundary_b[n-1-i]
-                c = boundary_a[i+1]
-                d = boundary_b[n-1-i-1]
-                connectors.append([a, b, d])
-                connectors.append([d, c, a])
+            if radius > 0:
+                for i in range(n-1):
+                    a = boundary_a[i]
+                    b = boundary_b[n-1-i]
+                    c = boundary_a[i+1]
+                    d = boundary_b[n-1-i-1]
+                    connectors.append([a, b, d])
+                    connectors.append([d, c, a])
             a = boundary_a[0]
             b = boundary_b[n-1]
             squares.append([a, b])
@@ -142,7 +143,11 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         emit_square(3, 4)
         emit_square(5, 6)
 
-        combined_faces.append(connectors)
+        if radius == 0:
+            assert len(connectors) // 2 == 6
+            combined_faces = connectors
+        else:
+            combined_faces.append(connectors)
 
     verts, faces = np.vstack(combined_verts), np.vstack(combined_faces)
 
@@ -303,3 +308,15 @@ if __name__ == "__main__":
     mesh = make_octaspheres(ndivisions=3, radius=3, width=16, height=16, depth=0)
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere6.svg", size=SIZE)
+
+    mesh = make_octaspheres(ndivisions=3, radius=3, width=16, height=0, depth=16)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere7.svg", size=SIZE)
+
+    mesh = make_octaspheres(ndivisions=3, radius=3, width=0, height=16, depth=16)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere8.svg", size=SIZE)
+
+    mesh = make_octaspheres(ndivisions=3, radius=0, width=16, height=16, depth=16)
+    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
+    engine.render("octasphere9.svg", size=SIZE)
