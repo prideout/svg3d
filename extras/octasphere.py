@@ -124,22 +124,20 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         connectors.append([c, d, a])
 
         # Side holes
-        squares = []
-        for patch in range(4):
+        def get_square(patch_index):
+            patch = patch_index // 2
             next_patch = 4 + (4 - patch) % 4
             boundary_a = boundaries[2] + num_verts * patch
             boundary_b = boundaries[1] + num_verts * next_patch
-            a = boundary_a[0]
-            b = boundary_b[n-1]
-            c = boundary_a[n-1]
-            d = boundary_b[0]
-            squares.append([a, b])
-            squares.append([c, d])
+            if patch_index % 2 == 0:
+                return boundary_a[0], boundary_b[n-1]
+            else:
+                return boundary_a[n-1], boundary_b[0]
+
         side_patches = [(7,0),(1,2),(3,4),(5,6)]
-        for pair in side_patches:
-            i, j = pair
-            a, b = squares[i]
-            c, d = squares[j]
+        for i, j in side_patches:
+            a, b = get_square(i)
+            c, d = get_square(j)
             connectors.append([a, b, d])
             connectors.append([d, c, a])
 
