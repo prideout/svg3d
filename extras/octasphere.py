@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
-"TODO: prealloc all numpy arrays"
+"""TODO:
+- get rid of "geodesic_verts" scratch space
+- duplicated verts along 0-dim axes
+- get rid of "boundaries" scratch space
+- prealloc all numpy arrays
+"""
 
 import numpy as np
 import pyrr
@@ -17,11 +22,12 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     depth = max(depth, r2)
     n = 2**ndivisions + 1
     num_verts = n * (n + 1) // 2
-    verts = []
     tx = (width - r2) / 2
     ty = (height - r2) / 2
     tz = (depth - r2) / 2
     translation = np.float32([tx, ty, tz])
+    verts = np.empty((num_verts, 3))
+    j = 0
     for i in range(n):
         theta = pi * 0.5 * i / (n - 1)
         point_a = [0, sin(theta), cos(theta)]
@@ -29,7 +35,9 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         num_segments = n - 1 - i
         geodesic_verts = compute_geodesic(point_a, point_b, num_segments)
         geodesic_verts = geodesic_verts * radius
-        verts = verts + [v for v in geodesic_verts]
+        k = j + len(geodesic_verts)
+        verts[j:k] = geodesic_verts
+        j = k
     assert len(verts) == num_verts
 
     num_faces = (n - 2) * (n - 1) + n - 1
@@ -67,6 +75,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
 
     if np.any(translation):
         boundaries = get_boundary_indices(ndivisions)
+        assert len(boundaries) == 3
         connectors = []
 
         if radius > 0:
@@ -318,7 +327,7 @@ if __name__ == "__main__":
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere7.svg", size=SIZE)
 
-    mesh = make_octaspheres(ndivisions=3, radius=3, width=0, height=16, depth=16)
+    mesh = make_octaspheres(ndivisions=4, radius=3, width=0, height=16, depth=16)
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere8.svg", size=SIZE)
 
