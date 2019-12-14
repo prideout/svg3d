@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 """TODO:
-- get rid of "geodesic_verts" scratch space
 - duplicated verts along 0-dim axes
 - get rid of "boundaries" scratch space
 - prealloc all numpy arrays
@@ -33,12 +32,9 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         point_a = [0, sin(theta), cos(theta)]
         point_b = [cos(theta), sin(theta), 0]
         num_segments = n - 1 - i
-        geodesic_verts = compute_geodesic(point_a, point_b, num_segments)
-        geodesic_verts = geodesic_verts * radius
-        k = j + len(geodesic_verts)
-        verts[j:k] = geodesic_verts
-        j = k
+        j = compute_geodesic(verts, j, point_a, point_b, num_segments)
     assert len(verts) == num_verts
+    verts = verts * radius
 
     num_faces = (n - 2) * (n - 1) + n - 1
     faces = []
@@ -177,21 +173,23 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     return verts, faces
 
 
-def compute_geodesic(point_a, point_b, num_segments):
+def compute_geodesic(dst, index, point_a, point_b, num_segments):
     """Given two points on a unit sphere, returns a sequence of surface
     points that lie between them along a geodesic curve."""
     angle_between_endpoints = acos(np.dot(point_a, point_b))
     rotation_axis = np.cross(point_a, point_b)
-    point_list = [point_a]
+    dst[index] = point_a
+    index = index + 1
     if num_segments == 0:
-        return np.float32(point_list)
+        return index
     dtheta = angle_between_endpoints / num_segments
     for point_index in range(1, num_segments):
         theta = point_index * dtheta
         q = quaternion.create_from_axis_rotation(rotation_axis, theta)
-        point_list.append(quaternion.apply_to_vector(q, point_a))
-    point_list.append(point_b)
-    return np.float32(point_list)
+        dst[index] = quaternion.apply_to_vector(q, point_a)
+        index = index + 1
+    dst[index] = point_b
+    return index + 1
 
 
 def get_boundary_indices(ndivisions):
