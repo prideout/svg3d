@@ -84,11 +84,11 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         assert len(boundaries) == 3
         connectors = []
 
-        def connect(a, b, c):
+        def connect(a, b, c, d):
             if np.allclose(verts[a], verts[b]): return
-            if np.allclose(verts[a], verts[c]): return
-            if np.allclose(verts[b], verts[c]): return
+            if np.allclose(verts[b], verts[d]): return
             connectors.append([a, b, c])
+            connectors.append([c, d, a])
 
         if radius > 0:
             # Top half
@@ -103,8 +103,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                     b = boundary_b[i]
                     c = boundary_a[i+1]
                     d = boundary_b[i+1]
-                    connect(a, b, d)
-                    connect(d, c, a)
+                    connect(a, b, d, c)
             # Bottom half
             for patch in range(4,8):
                 if patch % 2 == 0 and tx == 0: continue
@@ -117,8 +116,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                     b = boundary_b[i]
                     c = boundary_a[i+1]
                     d = boundary_b[i+1]
-                    connect(d, b, a)
-                    connect(a, c, d)
+                    connect(d, b, a, c)
             # Connect top patch to bottom patch
             if ty > 0:
                 for patch in range(4):
@@ -130,8 +128,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                         b = boundary_b[n-1-i]
                         c = boundary_a[i+1]
                         d = boundary_b[n-1-i-1]
-                        connect(a, b, d)
-                        connect(d, c, a)
+                        connect(a, b, d, c)
 
         if tx > 0 or ty > 0:
             # Top hole
@@ -139,15 +136,13 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
             b = a + num_verts
             c = b + num_verts
             d = c + num_verts
-            connect(a, b, c)
-            connect(c, d, a)
+            connect(a, b, c, d)
             # Bottom hole
             a = boundaries[2][0] + num_verts * 4
             b = a + num_verts
             c = b + num_verts
             d = c + num_verts
-            connect(a, b, c)
-            connect(c, d, a)
+            connect(a, b, c, d)
 
         # Side holes
         sides = []
@@ -171,8 +166,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                 c,d = boundary_a[0], boundary_b[n-1]
             else:
                 c,d = boundary_a[n-1], boundary_b[0]
-            connect(a, b, d)
-            connect(d, c, a)
+            connect(a, b, d, c)
 
         if radius == 0:
             assert len(connectors) // 2 == 6
