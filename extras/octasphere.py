@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
 
-"""TODO:
-- get rid of "boundaries" scratch space
-- prealloc all numpy arrays
-"""
-
 import numpy as np
 import pyrr
 
@@ -32,23 +27,21 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     verts = verts * radius
 
     num_faces = (n - 2) * (n - 1) + n - 1
-    faces = []
-    j0 = 0
+    faces = np.empty((num_faces, 3), dtype=np.int32)
+    f, j0 = 0, 0
     for col_index in range(n-1):
         col_height = n - 1 - col_index
-        col = []
         j1 = j0 + 1
         j2 = j0 + col_height + 1
         j3 = j0 + col_height + 2
         for row in range(col_height - 1):
-            col.append([j0 + row, j1 + row, j2 + row])
-            col.append([j2 + row, j1 + row, j3 + row])
+            faces[f + 0] = [j0 + row, j1 + row, j2 + row]
+            faces[f + 1] = [j2 + row, j1 + row, j3 + row]
+            f = f + 2
         row = col_height - 1
-        col.append([j0 + row, j1 + row, j2 + row])
+        faces[f] = [j0 + row, j1 + row, j2 + row]
+        f = f + 1
         j0 = j2
-        faces = faces + col
-    assert len(faces) == num_faces
-    faces = np.int32(faces)
 
     euler_angles = np.float32([
         [0, 0, 0], [0, 1, 0], [0, 2, 0], [0, 3, 0],
@@ -199,30 +192,29 @@ def compute_geodesic(dst, index, point_a, point_b, num_segments):
 def get_boundary_indices(ndivisions):
     "Generates the list of vertex indices for all three patch edges."
     n = 2**ndivisions + 1
-    boundaries = [[], [], []]
-    j0 = 0
+    boundaries = np.empty((3, n), np.int32)
+    a, b, c, j0 = 0, 0, 0, 0
     for col_index in range(n-1):
         col_height = n - 1 - col_index
-        col = []
         j1 = j0 + 1
-        j2 = j0 + col_height + 1
-        j3 = j0 + col_height + 2
-        boundaries[0].append(j0)
+        boundaries[0][a] = j0
+        a = a + 1
         for row in range(col_height - 1):
             if col_height == n - 1:
-                boundaries[2].append(j0 + row)
-            col.append([j0 + row, j1 + row, j2 + row])
-            col.append([j2 + row, j1 + row, j3 + row])
+                boundaries[2][c] = j0 + row
+                c = c + 1
         row = col_height - 1
         if col_height == n - 1:
-            boundaries[2].append(j0 + row)
-            boundaries[2].append(j1 + row)
-        boundaries[1].append(j1 + row)
-        col.append([j0 + row, j1 + row, j2 + row])
-        j0 = j2
-    boundaries[0].append(j0 + row)
-    boundaries[1].append(j0 + row)
-    return np.int32(boundaries)
+            boundaries[2][c] = j0 + row
+            c = c + 1
+            boundaries[2][c] = j1 + row
+            c = c + 1
+        boundaries[1][b] = j1 + row
+        b = b + 1
+        j0 = j0 + col_height + 1
+    boundaries[0][a] = j0 + row
+    boundaries[1][b] = j0 + row
+    return boundaries
 
 
 if __name__ == "__main__":
