@@ -1,4 +1,7 @@
-#!/usr/bin/env python3
+# This script can generate spheres, rounded cubes, and capsules.
+# For more information, see https://prideout.net/blog/octasphere/
+# Copyright (c) 2019 Philip Rideout
+# Distributed under the MIT License, see bottom of file.
 
 import numpy as np
 import pyrr
@@ -8,7 +11,20 @@ from math import *
 quaternion = pyrr.quaternion
 
 def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
-    "Returns a vertex and index array for a subdivided octahedron."
+    """Generates a triangle mesh for a sphere, rounded cube, or capsule.
+
+    The ndivisions argument can be used to control the level of detail
+    and should be between 0 and 5, inclusive.
+
+    To create a sphere, simply omit the width/height/depth arguments.
+
+    To create a capsule, set one of width/height/depth to a value
+    greater than twice the radius. To create a cuboid, set two or more
+    of these to a value greater than twice the radius.
+
+    Returns a two-tuple: a numpy array of 3D vertex positions,
+    and a numpy array of integer 3-tuples for triangle indices.
+    """
     r2 = 2 * radius
     width = max(width, r2)
     height = max(height, r2)
@@ -217,114 +233,20 @@ def get_boundary_indices(ndivisions):
     return boundaries
 
 
-if __name__ == "__main__":
-    from parent_folder import svg3d
-    import svgwrite.utils
-
-    create_ortho = pyrr.matrix44.create_orthogonal_projection
-    create_perspective = pyrr.matrix44.create_perspective_projection
-    create_lookat = pyrr.matrix44.create_look_at
-
-    np.set_printoptions(formatter={'float': lambda x: "{0:+0.3f}".format(x)})
-
-    SHININESS = 100
-    DIFFUSE = np.float32([1.0, 0.8, 0.2])
-    SPECULAR = np.float32([0.5, 0.5, 0.5])
-    SIZE = (512, 256)
-
-    def rgb(r, g, b):
-        r = max(0.0, min(r, 1.0))
-        g = max(0.0, min(g, 1.0))
-        b = max(0.0, min(b, 1.0))
-        return svgwrite.utils.rgb(r * 255, g * 255, b * 255)
-
-    def rotate_faces(faces):
-        q = quaternion.create_from_eulers([pi * -0.4, pi * 0.9, 0])
-        new_faces = []
-        for f in faces:
-            verts = [quaternion.apply_to_vector(q, v) for v in f]
-            new_faces.append(verts)
-        return np.float32(new_faces)
-
-    def translate_faces(faces, offset):
-        return faces + np.float32(offset)
-
-    def merge_faces(faces0, faces1):
-        return np.vstack([faces0, faces1])
-
-    projection = create_perspective(fovy=25, aspect=2, near=10, far=200)
-    view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
-    camera = svg3d.Camera(view_matrix, projection)
-
-    def make_octaspheres(ndivisions: int, radius: float, width=0, height=0, depth=0):
-        verts, indices = octasphere(ndivisions, radius, width, height, depth)
-        faces = verts[indices]
-
-        left = translate_faces(faces, [ -12, 0, 0])
-        right = translate_faces(rotate_faces(faces), [ 12, 0, 0])
-        faces = merge_faces(left, right)
-
-        ones = np.ones(faces.shape[:2] + (1,))
-        eyespace_faces = np.dstack([faces, ones])
-        eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
-        L = pyrr.vector.normalize(np.float32([20, 20, 50]))
-        E = np.float32([0, 0, 1])
-        H = pyrr.vector.normalize(L + E)
-
-        def frontface_shader(face_index, winding):
-            if winding < 0:
-                return None
-            face = eyespace_faces[face_index]
-            p0, p1, p2 = face[0], face[1], face[2]
-            N = pyrr.vector3.cross(p1 - p0, p2 - p0)
-            l2 = pyrr.vector3.squared_length(N)
-            if l2 > 0:
-                N = N / np.sqrt(l2)
-            df = max(0, np.dot(N, L))
-            sf = pow(max(0, np.dot(N, H)), SHININESS)
-            color = df * DIFFUSE + sf * SPECULAR
-            color = np.power(color, 1.0 / 2.2)
-            return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
-
-        print(f"Generated octasphere: {ndivisions}, {radius}, {width}, {height}, {depth}")
-        return [svg3d.Mesh(faces, frontface_shader)]
-
-    vp = svg3d.Viewport(-1, -.5, 2, 1)
-    engine = svg3d.Engine([])
-
-    mesh = make_octaspheres(ndivisions=2, radius=8)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere3.svg", size=SIZE)
-
-    mesh = make_octaspheres(ndivisions=3, radius=7, width=16, height=16, depth=16)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere1.svg", size=SIZE)
-
-    mesh = make_octaspheres(ndivisions=0, radius=7, width=16, height=16, depth=16)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere2.svg", size=SIZE)
-
-    if False:
-        mesh = make_octaspheres(ndivisions=5, radius=3, width=12, height=12, depth=12)
-        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-        engine.render("octasphere4.svg", size=SIZE)
-
-        mesh = make_octaspheres(ndivisions=5, radius=1, width=12, height=12, depth=12)
-        engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-        engine.render("octasphere5.svg", size=SIZE)
-
-    mesh = make_octaspheres(ndivisions=3, radius=3, width=16, height=16, depth=0)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere6.svg", size=SIZE)
-
-    mesh = make_octaspheres(ndivisions=3, radius=3, width=16, height=0, depth=16)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere7.svg", size=SIZE)
-
-    mesh = make_octaspheres(ndivisions=3, radius=3, width=0, height=16, depth=16)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere8.svg", size=SIZE)
-
-    mesh = make_octaspheres(ndivisions=3, radius=0, width=16, height=16, depth=16)
-    engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
-    engine.render("octasphere9.svg", size=SIZE)
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
