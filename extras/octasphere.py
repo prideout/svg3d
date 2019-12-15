@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 """TODO:
-- duplicated verts along 0-dim axes
 - get rid of "boundaries" scratch space
 - prealloc all numpy arrays
 """
@@ -21,10 +20,6 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     depth = max(depth, r2)
     n = 2**ndivisions + 1
     num_verts = n * (n + 1) // 2
-    tx = (width - r2) / 2
-    ty = (height - r2) / 2
-    tz = (depth - r2) / 2
-    translation = np.float32([tx, ty, tz])
     verts = np.empty((num_verts, 3))
     j = 0
     for i in range(n):
@@ -69,14 +64,37 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         combined_faces.append(rotated_faces)
         offset = offset + len(verts)
 
+    verts = np.vstack(combined_verts)
+
+    tx = (width - r2) / 2
+    ty = (height - r2) / 2
+    tz = (depth - r2) / 2
+    translation = np.float32([tx, ty, tz])
+
     if np.any(translation):
+
+        translation = np.float32([
+            [+1, +1, +1], [+1, +1, -1], [-1, +1, -1], [-1, +1, +1],
+            [+1, -1, +1], [-1, -1, +1], [-1, -1, -1], [+1, -1, -1],
+        ]) * translation
+        for i in range(0, len(verts), num_verts):
+            verts[i:i+num_verts] += translation[i // num_verts]
+
         boundaries = get_boundary_indices(ndivisions)
         assert len(boundaries) == 3
         connectors = []
 
+        def connect(a, b, c):
+            if np.allclose(verts[a], verts[b]): return
+            if np.allclose(verts[a], verts[c]): return
+            if np.allclose(verts[b], verts[c]): return
+            connectors.append([a, b, c])
+
         if radius > 0:
             # Top half
             for patch in range(4):
+                if patch % 2 == 0 and tz == 0: continue
+                if patch % 2 == 1 and tx == 0: continue
                 next_patch = (patch + 1) % 4
                 boundary_a = boundaries[1] + num_verts * patch
                 boundary_b = boundaries[0] + num_verts * next_patch
@@ -85,10 +103,12 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                     b = boundary_b[i]
                     c = boundary_a[i+1]
                     d = boundary_b[i+1]
-                    connectors.append([a, b, d])
-                    connectors.append([d, c, a])
+                    connect(a, b, d)
+                    connect(d, c, a)
             # Bottom half
             for patch in range(4,8):
+                if patch % 2 == 0 and tx == 0: continue
+                if patch % 2 == 1 and tz == 0: continue
                 next_patch = 4 + (patch + 1) % 4
                 boundary_a = boundaries[0] + num_verts * patch
                 boundary_b = boundaries[2] + num_verts * next_patch
@@ -97,8 +117,8 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                     b = boundary_b[i]
                     c = boundary_a[i+1]
                     d = boundary_b[i+1]
-                    connectors.append([d, b, a])
-                    connectors.append([a, c, d])
+                    connect(d, b, a)
+                    connect(a, c, d)
             # Connect top patch to bottom patch
             if ty > 0:
                 for patch in range(4):
@@ -110,8 +130,8 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                         b = boundary_b[n-1-i]
                         c = boundary_a[i+1]
                         d = boundary_b[n-1-i-1]
-                        connectors.append([a, b, d])
-                        connectors.append([d, c, a])
+                        connect(a, b, d)
+                        connect(d, c, a)
 
         if tx > 0 or ty > 0:
             # Top hole
@@ -119,19 +139,20 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
             b = a + num_verts
             c = b + num_verts
             d = c + num_verts
-            connectors.append([a, b, c])
-            connectors.append([c, d, a])
+            connect(a, b, c)
+            connect(c, d, a)
             # Bottom hole
             a = boundaries[2][0] + num_verts * 4
             b = a + num_verts
             c = b + num_verts
             d = c + num_verts
-            connectors.append([a, b, c])
-            connectors.append([c, d, a])
+            connect(a, b, c)
+            connect(c, d, a)
 
         # Side holes
-        for i, j in [(7,0),(1,2),(3,4),(5,6)]:
-
+        sides = []
+        if ty > 0: sides = [(7,0),(1,2),(3,4),(5,6)]
+        for i, j in sides:
             patch_index = i
             patch = patch_index // 2
             next_patch = 4 + (4 - patch) % 4
@@ -141,7 +162,6 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                 a,b = boundary_a[0], boundary_b[n-1]
             else:
                 a,b = boundary_a[n-1], boundary_b[0]
-
             patch_index = j
             patch = patch_index // 2
             next_patch = 4 + (4 - patch) % 4
@@ -151,9 +171,8 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                 c,d = boundary_a[0], boundary_b[n-1]
             else:
                 c,d = boundary_a[n-1], boundary_b[0]
-
-            connectors.append([a, b, d])
-            connectors.append([d, c, a])
+            connect(a, b, d)
+            connect(d, c, a)
 
         if radius == 0:
             assert len(connectors) // 2 == 6
@@ -161,17 +180,7 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
         else:
             combined_faces.append(connectors)
 
-    verts, faces = np.vstack(combined_verts), np.vstack(combined_faces)
-
-    translation = np.float32([
-        [+1, +1, +1], [+1, +1, -1], [-1, +1, -1], [-1, +1, +1],
-        [+1, -1, +1], [-1, -1, +1], [-1, -1, -1], [+1, -1, -1],
-    ]) * translation
-
-    for i in range(0, len(verts), num_verts):
-        verts[i:i+num_verts] += translation[i // num_verts]
-
-    return verts, faces
+    return verts, np.vstack(combined_faces)
 
 
 def compute_geodesic(dst, index, point_a, point_b, num_segments):
@@ -291,7 +300,7 @@ if __name__ == "__main__":
             color = np.power(color, 1.0 / 2.2)
             return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
 
-        print(f"Generated octasphere with {ndivisions} subdivisions.")
+        print(f"Generated octasphere: {ndivisions}, {radius}, {width}, {height}, {depth}")
         return [svg3d.Mesh(faces, frontface_shader)]
 
     vp = svg3d.Viewport(-1, -.5, 2, 1)
