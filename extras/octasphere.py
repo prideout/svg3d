@@ -100,33 +100,34 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
                     connectors.append([d, b, a])
                     connectors.append([a, c, d])
             # Connect top patch to bottom patch
-            for patch in range(4):
-                next_patch = 4 + (4 - patch) % 4
-                boundary_a = boundaries[2] + num_verts * patch
-                boundary_b = boundaries[1] + num_verts * next_patch
-                for i in range(n-1):
-                    a = boundary_a[i]
-                    b = boundary_b[n-1-i]
-                    c = boundary_a[i+1]
-                    d = boundary_b[n-1-i-1]
-                    connectors.append([a, b, d])
-                    connectors.append([d, c, a])
+            if ty > 0:
+                for patch in range(4):
+                    next_patch = 4 + (4 - patch) % 4
+                    boundary_a = boundaries[2] + num_verts * patch
+                    boundary_b = boundaries[1] + num_verts * next_patch
+                    for i in range(n-1):
+                        a = boundary_a[i]
+                        b = boundary_b[n-1-i]
+                        c = boundary_a[i+1]
+                        d = boundary_b[n-1-i-1]
+                        connectors.append([a, b, d])
+                        connectors.append([d, c, a])
 
-        # Top hole
-        a = boundaries[0][-1]
-        b = a + num_verts
-        c = b + num_verts
-        d = c + num_verts
-        connectors.append([a, b, c])
-        connectors.append([c, d, a])
-
-        # Bottom hole
-        a = boundaries[2][0] + num_verts * 4
-        b = a + num_verts
-        c = b + num_verts
-        d = c + num_verts
-        connectors.append([a, b, c])
-        connectors.append([c, d, a])
+        if tx > 0 or ty > 0:
+            # Top hole
+            a = boundaries[0][-1]
+            b = a + num_verts
+            c = b + num_verts
+            d = c + num_verts
+            connectors.append([a, b, c])
+            connectors.append([c, d, a])
+            # Bottom hole
+            a = boundaries[2][0] + num_verts * 4
+            b = a + num_verts
+            c = b + num_verts
+            d = c + num_verts
+            connectors.append([a, b, c])
+            connectors.append([c, d, a])
 
         # Side holes
         for i, j in [(7,0),(1,2),(3,4),(5,6)]:
@@ -325,7 +326,7 @@ if __name__ == "__main__":
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere7.svg", size=SIZE)
 
-    mesh = make_octaspheres(ndivisions=4, radius=3, width=0, height=16, depth=16)
+    mesh = make_octaspheres(ndivisions=3, radius=3, width=0, height=16, depth=16)
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere8.svg", size=SIZE)
 
