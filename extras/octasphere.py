@@ -81,102 +81,13 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
     translation = np.float32([tx, ty, tz])
 
     if np.any(translation):
-
         translation = np.float32([
             [+1, +1, +1], [+1, +1, -1], [-1, +1, -1], [-1, +1, +1],
             [+1, -1, +1], [-1, -1, +1], [-1, -1, -1], [+1, -1, -1],
         ]) * translation
         for i in range(0, len(verts), num_verts):
             verts[i:i+num_verts] += translation[i // num_verts]
-
-        boundaries = get_boundary_indices(ndivisions)
-        assert len(boundaries) == 3
-        connectors = []
-
-        def connect(a, b, c, d):
-            if np.allclose(verts[a], verts[b]): return
-            if np.allclose(verts[b], verts[d]): return
-            connectors.append([a, b, c])
-            connectors.append([c, d, a])
-
-        if radius > 0:
-            # Top half
-            for patch in range(4):
-                if patch % 2 == 0 and tz == 0: continue
-                if patch % 2 == 1 and tx == 0: continue
-                next_patch = (patch + 1) % 4
-                boundary_a = boundaries[1] + num_verts * patch
-                boundary_b = boundaries[0] + num_verts * next_patch
-                for i in range(n-1):
-                    a = boundary_a[i]
-                    b = boundary_b[i]
-                    c = boundary_a[i+1]
-                    d = boundary_b[i+1]
-                    connect(a, b, d, c)
-            # Bottom half
-            for patch in range(4,8):
-                if patch % 2 == 0 and tx == 0: continue
-                if patch % 2 == 1 and tz == 0: continue
-                next_patch = 4 + (patch + 1) % 4
-                boundary_a = boundaries[0] + num_verts * patch
-                boundary_b = boundaries[2] + num_verts * next_patch
-                for i in range(n-1):
-                    a = boundary_a[i]
-                    b = boundary_b[i]
-                    c = boundary_a[i+1]
-                    d = boundary_b[i+1]
-                    connect(d, b, a, c)
-            # Connect top patch to bottom patch
-            if ty > 0:
-                for patch in range(4):
-                    next_patch = 4 + (4 - patch) % 4
-                    boundary_a = boundaries[2] + num_verts * patch
-                    boundary_b = boundaries[1] + num_verts * next_patch
-                    for i in range(n-1):
-                        a = boundary_a[i]
-                        b = boundary_b[n-1-i]
-                        c = boundary_a[i+1]
-                        d = boundary_b[n-1-i-1]
-                        connect(a, b, d, c)
-
-        if tx > 0 or ty > 0:
-            # Top hole
-            a = boundaries[0][-1]
-            b = a + num_verts
-            c = b + num_verts
-            d = c + num_verts
-            connect(a, b, c, d)
-            # Bottom hole
-            a = boundaries[2][0] + num_verts * 4
-            b = a + num_verts
-            c = b + num_verts
-            d = c + num_verts
-            connect(a, b, c, d)
-
-        # Side holes
-        sides = []
-        if ty > 0: sides = [(7,0),(1,2),(3,4),(5,6)]
-        for i, j in sides:
-            patch_index = i
-            patch = patch_index // 2
-            next_patch = 4 + (4 - patch) % 4
-            boundary_a = boundaries[2] + num_verts * patch
-            boundary_b = boundaries[1] + num_verts * next_patch
-            if patch_index % 2 == 0:
-                a,b = boundary_a[0], boundary_b[n-1]
-            else:
-                a,b = boundary_a[n-1], boundary_b[0]
-            patch_index = j
-            patch = patch_index // 2
-            next_patch = 4 + (4 - patch) % 4
-            boundary_a = boundaries[2] + num_verts * patch
-            boundary_b = boundaries[1] + num_verts * next_patch
-            if patch_index % 2 == 0:
-                c,d = boundary_a[0], boundary_b[n-1]
-            else:
-                c,d = boundary_a[n-1], boundary_b[0]
-            connect(a, b, d, c)
-
+        connectors = add_connectors(ndivisions, radius, width, height, depth)
         if radius == 0:
             assert len(connectors) // 2 == 6
             combined_faces = connectors
@@ -184,6 +95,107 @@ def octasphere(ndivisions: int, radius: float, width=0, height=0, depth=0):
             combined_faces.append(connectors)
 
     return verts, np.vstack(combined_faces)
+
+def add_connectors(ndivisions, radius, width, height, depth):
+    r2 = 2 * radius
+    width = max(width, r2)
+    height = max(height, r2)
+    depth = max(depth, r2)
+    n = 2**ndivisions + 1
+    num_verts = n * (n + 1) // 2
+    tx = (width - r2) / 2
+    ty = (height - r2) / 2
+    tz = (depth - r2) / 2
+
+    boundaries = get_boundary_indices(ndivisions)
+    assert len(boundaries) == 3
+    connectors = []
+
+    def connect(a, b, c, d):
+        # if np.allclose(verts[a], verts[b]): return
+        # if np.allclose(verts[b], verts[d]): return
+        connectors.append([a, b, c])
+        connectors.append([c, d, a])
+
+    if radius > 0:
+        # Top half
+        for patch in range(4):
+            if patch % 2 == 0 and tz == 0: continue
+            if patch % 2 == 1 and tx == 0: continue
+            next_patch = (patch + 1) % 4
+            boundary_a = boundaries[1] + num_verts * patch
+            boundary_b = boundaries[0] + num_verts * next_patch
+            for i in range(n-1):
+                a = boundary_a[i]
+                b = boundary_b[i]
+                c = boundary_a[i+1]
+                d = boundary_b[i+1]
+                connect(a, b, d, c)
+        # Bottom half
+        for patch in range(4,8):
+            if patch % 2 == 0 and tx == 0: continue
+            if patch % 2 == 1 and tz == 0: continue
+            next_patch = 4 + (patch + 1) % 4
+            boundary_a = boundaries[0] + num_verts * patch
+            boundary_b = boundaries[2] + num_verts * next_patch
+            for i in range(n-1):
+                a = boundary_a[i]
+                b = boundary_b[i]
+                c = boundary_a[i+1]
+                d = boundary_b[i+1]
+                connect(d, b, a, c)
+        # Connect top patch to bottom patch
+        if ty > 0:
+            for patch in range(4):
+                next_patch = 4 + (4 - patch) % 4
+                boundary_a = boundaries[2] + num_verts * patch
+                boundary_b = boundaries[1] + num_verts * next_patch
+                for i in range(n-1):
+                    a = boundary_a[i]
+                    b = boundary_b[n-1-i]
+                    c = boundary_a[i+1]
+                    d = boundary_b[n-1-i-1]
+                    connect(a, b, d, c)
+
+    if tx > 0 or ty > 0:
+        # Top hole
+        a = boundaries[0][-1]
+        b = a + num_verts
+        c = b + num_verts
+        d = c + num_verts
+        connect(a, b, c, d)
+        # Bottom hole
+        a = boundaries[2][0] + num_verts * 4
+        b = a + num_verts
+        c = b + num_verts
+        d = c + num_verts
+        connect(a, b, c, d)
+
+    # Side holes
+    sides = []
+    if ty > 0: sides = [(7,0),(1,2),(3,4),(5,6)]
+    for i, j in sides:
+        patch_index = i
+        patch = patch_index // 2
+        next_patch = 4 + (4 - patch) % 4
+        boundary_a = boundaries[2] + num_verts * patch
+        boundary_b = boundaries[1] + num_verts * next_patch
+        if patch_index % 2 == 0:
+            a,b = boundary_a[0], boundary_b[n-1]
+        else:
+            a,b = boundary_a[n-1], boundary_b[0]
+        patch_index = j
+        patch = patch_index // 2
+        next_patch = 4 + (4 - patch) % 4
+        boundary_a = boundaries[2] + num_verts * patch
+        boundary_b = boundaries[1] + num_verts * next_patch
+        if patch_index % 2 == 0:
+            c,d = boundary_a[0], boundary_b[n-1]
+        else:
+            c,d = boundary_a[n-1], boundary_b[0]
+        connect(a, b, d, c)
+
+    return connectors
 
 
 def compute_geodesic(dst, index, point_a, point_b, num_segments):

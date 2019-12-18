@@ -5,12 +5,15 @@ import svgwrite.utils
 from octasphere import octasphere
 import pyrr
 from parent_folder import svg3d
+from math import *
 
 create_ortho = pyrr.matrix44.create_orthogonal_projection
 create_perspective = pyrr.matrix44.create_perspective_projection
 create_lookat = pyrr.matrix44.create_look_at
 
 np.set_printoptions(formatter={'float': lambda x: "{0:+0.3f}".format(x)})
+
+quaternion = pyrr.quaternion
 
 SHININESS = 100
 DIFFUSE = np.float32([1.0, 0.8, 0.2])
@@ -114,60 +117,94 @@ if False:
     engine.views = [svg3d.View(camera, svg3d.Scene(mesh), vp)]
     engine.render("octasphere9.svg", size=SIZE)
 
-verts, indices = octasphere(ndivisions=3, radius=1, width=13, height=13, depth=13)
-projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
-view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
-camera = svg3d.Camera(view_matrix, projection)
-faces = verts[indices]
-ones = np.ones(faces.shape[:2] + (1,))
-eyespace_faces = np.dstack([faces, ones])
-eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
-L = pyrr.vector.normalize(np.float32([20, 20, 50]))
-E = np.float32([0, 0, 1])
-H = pyrr.vector.normalize(L + E)
-def frontface_shader(face_index, winding):
-    if winding < 0:
-        return None
-    face = eyespace_faces[face_index]
-    p0, p1, p2 = face[0], face[1], face[2]
-    N = pyrr.vector3.cross(p1 - p0, p2 - p0)
-    l2 = pyrr.vector3.squared_length(N)
-    if l2 > 0:
-        N = N / np.sqrt(l2)
-    df = max(0, np.dot(N, L))
-    sf = pow(max(0, np.dot(N, H)), SHININESS)
-    color = df * DIFFUSE + sf * SPECULAR
-    color = np.power(color, 1.0 / 2.2)
-    return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
-mesh = [svg3d.Mesh(faces, frontface_shader)]
-engine.views = [svg3d.View(camera, svg3d.Scene(mesh))]
-engine.render("RoundedCube.svg", size=(256, 256))
+def tile():
+    verts, indices = octasphere(ndivisions=3, radius=3, width=18, height=18, depth=0)
+    view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+    faces = verts[indices]
+    ones = np.ones(faces.shape[:2] + (1,))
+    eyespace_faces = np.dstack([faces, ones])
+    eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
+    L = pyrr.vector.normalize(np.float32([20, 20, 50]))
+    E = np.float32([0, 0, 1])
+    H = pyrr.vector.normalize(L + E)
+    def frontface_shader(face_index, winding):
+        if winding < 0:
+            return None
+        face = eyespace_faces[face_index]
+        p0, p1, p2 = face[0], face[1], face[2]
+        N = pyrr.vector3.cross(p1 - p0, p2 - p0)
+        l2 = pyrr.vector3.squared_length(N)
+        if l2 > 0:
+            N = N / np.sqrt(l2)
+        df = max(0, np.dot(N, L))
+        sf = pow(max(0, np.dot(N, H)), SHININESS)
+        color = df * DIFFUSE + sf * SPECULAR
+        color = np.power(color, 1.0 / 2.2)
+        return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
+    return svg3d.Mesh(faces, frontface_shader)
 
-verts, indices = octasphere(ndivisions=3, radius=5, width=20, height=0, depth=0)
-projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
+def rounded_cube():
+    verts, indices = octasphere(ndivisions=3, radius=1, width=15, height=15, depth=13)
+    view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+    faces = verts[indices]
+    ones = np.ones(faces.shape[:2] + (1,))
+    eyespace_faces = np.dstack([faces, ones])
+    eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
+    L = pyrr.vector.normalize(np.float32([20, 20, 50]))
+    E = np.float32([0, 0, 1])
+    H = pyrr.vector.normalize(L + E)
+    def frontface_shader(face_index, winding):
+        if winding < 0:
+            return None
+        face = eyespace_faces[face_index]
+        p0, p1, p2 = face[0], face[1], face[2]
+        N = pyrr.vector3.cross(p1 - p0, p2 - p0)
+        l2 = pyrr.vector3.squared_length(N)
+        if l2 > 0:
+            N = N / np.sqrt(l2)
+        df = max(0, np.dot(N, L))
+        sf = pow(max(0, np.dot(N, H)), SHININESS)
+        color = df * DIFFUSE + sf * SPECULAR
+        color = np.power(color, 1.0 / 2.2)
+        return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
+    return svg3d.Mesh(faces, frontface_shader)
+
+def capsule():
+    verts, indices = octasphere(ndivisions=3, radius=4, width=18, height=0, depth=0)
+    view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+    faces = verts[indices]
+    ones = np.ones(faces.shape[:2] + (1,))
+    eyespace_faces = np.dstack([faces, ones])
+    eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
+    L = pyrr.vector.normalize(np.float32([20, 20, 50]))
+    E = np.float32([0, 0, 1])
+    H = pyrr.vector.normalize(L + E)
+    def frontface_shader(face_index, winding):
+        if winding < 0:
+            return None
+        face = eyespace_faces[face_index]
+        p0, p1, p2 = face[0], face[1], face[2]
+        N = pyrr.vector3.cross(p1 - p0, p2 - p0)
+        l2 = pyrr.vector3.squared_length(N)
+        if l2 > 0:
+            N = N / np.sqrt(l2)
+        df = max(0, np.dot(N, L))
+        sf = pow(max(0, np.dot(N, H)), SHININESS)
+        color = df * DIFFUSE + sf * SPECULAR
+        color = np.power(color, 1.0 / 2.2)
+        return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
+    return svg3d.Mesh(faces, frontface_shader)
+
 view_matrix = create_lookat(eye=[25, 20, 60], target=[0, 0, 0], up=[0, 1, 0])
+projection = create_perspective(fovy=25, aspect=1, near=10, far=200)
 camera = svg3d.Camera(view_matrix, projection)
-faces = verts[indices]
-ones = np.ones(faces.shape[:2] + (1,))
-eyespace_faces = np.dstack([faces, ones])
-eyespace_faces = np.dot(eyespace_faces, view_matrix)[:, :, :3]
-L = pyrr.vector.normalize(np.float32([20, 20, 50]))
-E = np.float32([0, 0, 1])
-H = pyrr.vector.normalize(L + E)
-def frontface_shader(face_index, winding):
-    if winding < 0:
-        return None
-    face = eyespace_faces[face_index]
-    p0, p1, p2 = face[0], face[1], face[2]
-    N = pyrr.vector3.cross(p1 - p0, p2 - p0)
-    l2 = pyrr.vector3.squared_length(N)
-    if l2 > 0:
-        N = N / np.sqrt(l2)
-    df = max(0, np.dot(N, L))
-    sf = pow(max(0, np.dot(N, H)), SHININESS)
-    color = df * DIFFUSE + sf * SPECULAR
-    color = np.power(color, 1.0 / 2.2)
-    return dict(fill=rgb(*color), stroke="black", stroke_width="0.001")
-mesh = [svg3d.Mesh(faces, frontface_shader)]
-engine.views = [svg3d.View(camera, svg3d.Scene(mesh))]
-engine.render("Capsule.svg", size=(256, 256))
+dx = .9
+x = -.5
+y = -.15
+w, h = 1.3, 1.3
+engine.views = [
+    svg3d.View(camera, svg3d.Scene([tile()]), svg3d.Viewport(x-1, y-.5, w, h)),
+    svg3d.View(camera, svg3d.Scene([rounded_cube()]), svg3d.Viewport(x-1+dx, y-.5, w, h)),
+    svg3d.View(camera, svg3d.Scene([capsule()]), svg3d.Viewport(x-1+dx*2, y-.5, w, h)),
+]
+engine.render("ThreeCuboids.svg", size=(600, 200))
