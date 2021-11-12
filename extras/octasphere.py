@@ -202,7 +202,7 @@ def compute_geodesic(dst, index, point_a, point_b, num_segments):
     """Given two points on a unit sphere, returns a sequence of surface
     points that lie between them along a geodesic curve."""
     angle_between_endpoints = acos(np.dot(point_a, point_b))
-    rotation_axis = np.cross(point_a, point_b)
+    rotation_axis = np.linalg.norm(np.cross(point_a, point_b))
     dst[index] = point_a
     index = index + 1
     if num_segments == 0:
