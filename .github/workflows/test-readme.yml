@@ -1,0 +1,41 @@
+name: Test README code blocks
+
+on:
+  # trigger on pull requests
+  pull_request:
+
+  # trigger on all commits to main
+  push:
+    branches:
+      - 'main'
+
+  # trigger on request
+  workflow_dispatch:
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run README examples.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+        python: ['3.12'] # Aim for a commonly used distro
+    steps:
+    - name: Set up and build
+      uses: ./.github/workflows/setup-and-build.yaml
+      with:
+        python: ${{ matrix.python }}
+        os: ${{ matrix.os }}
+
+    - name: Extract code blocks
+      run: |
+        awk >
+        '/```python/ {in_block=1; file="README_code_" ++count ".py"; next} /```/
+        {in_block=0; next} in_block {print > file}
+        ' README.md
+    - name: Test README code blocks
+      run: for f in README_code*.py; do python3 "$f"; done && echo OK

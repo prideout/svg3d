@@ -1,0 +1,30 @@
+name: Setup Python Environment
+
+on:
+  workflow_call:
+    inputs:
+      python:
+        required: true
+        type: string
+      os:
+        required: true
+        type: string
+
+jobs:
+  setup:
+    runs-on: ${{ inputs.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29  # v4.2.1
+      - name: Set up Python ${{ inputs.python }}
+        uses: actions/setup-python@f677139bbe7f9c59b41e40162b753c062f5d49a3 # v5.2.0
+        with:
+          python-version: ${{ inputs.python }}
+      - name: Set up Python environment
+        uses: glotzerlab/workflows/setup-uv@3573ddaebf3290e00bfb150b82a46412192a61d3
+        with:
+          lockfile: ".github/requirements${{ inputs.python }}.txt"
+      - name: Install package
+        run: |
+          python --version
+          uv pip install . --no-build-isolation --no-deps --system -v
