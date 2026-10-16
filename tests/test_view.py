@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 import numpy.testing as npt
 import pyrr
@@ -132,6 +134,46 @@ def test_isometric_axes_are_120_degrees_apart():
         npt.assert_allclose(np.degrees(np.arccos(cos_theta)), 120.0, atol=1e-9)
 
 
+def test_isometric_cube_silhouette_is_a_regular_hexagon(tmp_path):
+    """An exactly isometric view of a cube must yield a regular hexagon outline.
+
+    All three axes foreshorten equally to sqrt(2/3), so the silhouette of a unit
+    cube is a regular hexagon whose circumradius is the projected distance of the
+    "equator" corners from the view axis, sqrt(2/3) * (0.5 / half_width) in SVG
+    units, and the near and far cube corners project onto its center.
+    """
+    mesh = Mesh.example_mesh()
+    out = tmp_path / "hexagon.svg"
+    Engine([View.isometric([mesh])]).render(str(out))
+
+    points = {
+        tuple(round(float(c), 12) for c in pair.split(","))
+        for attr in re.findall(r'points="([^"]+)"', out.read_text())
+        for pair in attr.split()
+    }
+    pts = np.array(sorted(points))
+    # 8 cube corners, with the near and far corners coinciding at the centre.
+    assert len(pts) == 7
+
+    centre = pts.mean(axis=0)
+    radii = np.linalg.norm(pts - centre, axis=1)
+    outer = radii > radii.max() / 2
+    assert outer.sum() == 6
+
+    # Regular hexagon: all six circumradii should equal the closed form.
+    half_width = 100.0 * np.tan(np.radians(1.0) / 2)
+    expected = 0.5 * np.sqrt(2 / 3) / half_width
+    npt.assert_allclose(radii[outer], expected, atol=1e-9)
+    # The near and far corners coincide exactly at the hexagon's center.
+    assert radii[~outer][0] < 1e-9
+
+    # A regular hexagon's sides equal its circumradius.
+    xy = pts[outer] - centre
+    ordered = pts[outer][np.argsort(np.arctan2(xy[:, 1], xy[:, 0]))]
+    sides = np.linalg.norm(np.roll(ordered, -1, axis=0) - ordered, axis=1)
+    npt.assert_allclose(sides, expected, atol=1e-9)
+
+
 def test_dimetric_two_axes_equal_and_trimetric_none():
     dim = np.linalg.norm(_projected_axes(View.dimetric([])), axis=1)
     npt.assert_allclose(dim[0], dim[1], atol=1e-12)
@@ -245,6 +287,28 @@ def test_faces_are_drawn_back_to_front(view_name, tmp_path):
     Engine([getattr(View, view_name)([mesh])]).render(str(out))
     svg = out.read_text()
     assert svg.index("#ff0000") < svg.index("#0000ff")
+
+
+def test_faces_of_mixed_sizes_sort_by_centroid_depth(tmp_path):
+    """Short faces must not be ordered by their (padded, repeated) first vertex."""
+    triangle = np.array([[-1.2, 0.0, -8.0], [-1.0, 0.2, -1.5], [-1.4, 0.2, -1.5]])
+    quad = np.array(
+        [[0.0, -0.2, -4.7], [0.4, -0.2, -4.7], [0.4, 0.2, -4.7], [0.0, 0.2, -4.7]]
+    )
+    view = View.from_look_at_and_projection(
+        look_at=np.eye(4),
+        projection=get_orthographic_matrix(2.0, 2.0, 1.0, 10.0),
+        scene=[],
+    )
+    mesh = Mesh(
+        faces=[triangle, quad],
+        shader=lambda index, mesh: {"fill": "#ff0000" if index == 0 else "#0000ff"},
+    )
+    view.scene = [mesh]
+    out = tmp_path / "mixed_sizes.svg"
+    Engine([view]).render(str(out))
+    svg = out.read_text()
+    assert svg.index("#0000ff") < svg.index("#ff0000")
 
 
 @pytest.mark.parametrize(
