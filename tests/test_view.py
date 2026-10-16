@@ -8,7 +8,14 @@ from hypothesis import given
 from hypothesis.extra.numpy import arrays
 from hypothesis.strategies import floats
 
-from svg3d import View, get_lookat_matrix, get_projection_matrix
+from svg3d import (
+    Engine,
+    Mesh,
+    View,
+    get_lookat_matrix,
+    get_orthographic_matrix,
+    get_projection_matrix,
+)
 
 MIN_VALID_DISTANCE = 1e-12
 PRECISION = 1e-12  # Small deviations are OK given the rigor of hypothesis testing
@@ -69,3 +76,168 @@ def test_isometric_view():
     npt.assert_allclose(
         View.ISOMETRIC_VIEW_MATRIX, isometric_view_matrix, atol=PRECISION
     )
+
+
+@given(
+    z_near=floats(MIN_VALID_DISTANCE, 100, exclude_min=True),
+    z_far_distance=floats(MIN_VALID_DISTANCE, 100, exclude_min=True),
+    half_width=floats(MIN_VALID_DISTANCE, 100, exclude_min=True),
+    half_height=floats(MIN_VALID_DISTANCE, 100, exclude_min=True),
+)
+def test_get_orthographic_matrix(z_near, z_far_distance, half_width, half_height):
+    z_far = z_near + z_far_distance
+    npt.assert_allclose(
+        get_orthographic_matrix(half_width, half_height, z_near, z_far),
+        pyrr.matrix44.create_orthogonal_projection_matrix(
+            -half_width, half_width, -half_height, half_height, z_near, z_far
+        ),
+        atol=PRECISION,
+    )
+
+
+def _projected_axes(view):
+    """Project the unit world axes through a view; return 2D image vectors."""
+    axes = np.concatenate([np.eye(3), np.ones((3, 1))], axis=1)
+    projected = axes @ (view.look_at @ view.projection)
+    return projected[:, :2] / projected[:, 3:4]
+
+
+@pytest.mark.parametrize(
+    "view_name, view_direction",
+    [
+        ("isometric", (1, 1, 1)),
+        ("dimetric", (8, 8, 21)),
+        ("trimetric", (2, 1, 3)),
+    ],
+)
+def test_axonometric_foreshortening_is_exact(view_name, view_direction):
+    """Projected axis lengths must match the closed form sqrt(1 - n_i^2) exactly."""
+    n = np.array(view_direction, dtype=np.float64)
+    n /= np.linalg.norm(n)
+    view = getattr(View, view_name)([])
+    # The projection scales the image by 1 / half_width; the foreshortening
+    # relative to that common scale must match the closed form sqrt(1 - n_i^2).
+    expected = np.sqrt(1 - n**2) * view.projection[0, 0]
+
+    got = np.linalg.norm(_projected_axes(view), axis=1)
+    npt.assert_allclose(got, expected, atol=1e-12)
+
+
+def test_isometric_axes_are_120_degrees_apart():
+    axes = _projected_axes(View.isometric([]))
+    for i, j in [(0, 1), (0, 2), (1, 2)]:
+        cos_theta = np.dot(axes[i], axes[j]) / np.prod(
+            np.linalg.norm([axes[i], axes[j]], axis=1)
+        )
+        npt.assert_allclose(np.degrees(np.arccos(cos_theta)), 120.0, atol=1e-9)
+
+
+def test_dimetric_two_axes_equal_and_trimetric_none():
+    dim = np.linalg.norm(_projected_axes(View.dimetric([])), axis=1)
+    npt.assert_allclose(dim[0], dim[1], atol=1e-12)
+    assert not np.isclose(dim[0], dim[2], rtol=0, atol=1e-9)
+
+    tri = np.linalg.norm(_projected_axes(View.trimetric([])), axis=1)
+    assert len({round(x, 9) for x in tri}) == 3
+
+
+def test_axonometric_projection_is_parallel():
+    """Image of an edge must not depend on its depth along the view direction."""
+    n = np.array([1.0, 1.0, 1.0]) / np.sqrt(3)
+    edge = np.array([[0.5, 0, 0], [-0.5, 0, 0], [-0.5, 0, 0]])
+
+    view = View.isometric([])
+    projection = view.look_at @ view.projection
+    unit_x_image = _projected_axes(view)[0]
+    for depth in (0.0, 1.0, 5.0, 50.0):
+        points = np.concatenate([edge + depth * n, np.ones((3, 1))], axis=1)
+        image = points @ projection
+        image = image[:, :2] / image[:, 3:4]
+        # The image of the unit x axis is identical at every depth.
+        npt.assert_allclose(image[0] - image[1], unit_x_image, atol=1e-12)
+
+
+@pytest.mark.parametrize(
+    "fov, distance", [(1.0, 100.0), (1.0, 50.0), (90.0, 100.0), (30.0, 250.0)]
+)
+def test_parallel_projection_window_follows_fov_and_distance(fov, distance):
+    """Rendered scale must be exactly 1 / (distance * tan(fov / 2)) per NDC unit."""
+    view = View.isometric([], fov=fov, distance=distance)
+    half_width = distance * np.tan(np.radians(fov) / 2)
+    npt.assert_allclose(view.projection[0, 0], 1.0 / half_width, rtol=1e-12)
+    npt.assert_allclose(view.projection[1, 1], 1.0 / half_width, rtol=1e-12)
+
+
+@pytest.mark.parametrize("view_name", ["isometric", "dimetric", "trimetric"])
+@pytest.mark.parametrize("distance", [1.0, 100.0, 250.0, 1000.0])
+def test_view_volume_tracks_distance(view_name, distance):
+    """The object, and a margin around it, must stay inside the view volume (B2)."""
+    view = getattr(View, view_name)([], distance=distance)
+    # World direction that maps onto the camera's viewing axis.
+    view_axis = (np.array([0.0, 0.0, -1.0, 0.0]) @ np.linalg.inv(view.look_at))[:3]
+
+    ndc_z = []
+    for depth in (0.5 * distance, distance, 1.5 * distance):
+        point = np.append((depth - distance) * view_axis, 1.0)
+        ndc = point @ (view.look_at @ view.projection)
+        assert np.all(np.abs(ndc[:3]) < 1.0), f"depth {depth} is outside the volume"
+        ndc_z.append(ndc[2])
+    # Farther points must map to larger NDC z (catches reversed near/far planes).
+    assert ndc_z[0] < ndc_z[1] < ndc_z[2]
+
+
+@pytest.mark.parametrize("view_name", ["isometric", "dimetric", "trimetric"])
+def test_named_views_place_object_at_documented_distance(view_name):
+    """The object origin must sit exactly ``distance`` in front of the camera."""
+    for distance in (1.0, 100.0, 250.0):
+        view = getattr(View, view_name)([], distance=distance)
+        origin = np.array([0.0, 0.0, 0.0, 1.0]) @ view.look_at
+        npt.assert_allclose(origin[2], -distance, atol=1e-9)
+
+
+@pytest.mark.parametrize("view_name", ["isometric", "dimetric", "trimetric"])
+def test_faces_are_drawn_back_to_front(view_name, tmp_path):
+    """Painter's algorithm: the farther face must be drawn first."""
+    base = np.array([[0.0, 0.0, 0.0], [0.3, 0.0, 0.0], [0.0, 0.3, 0.0]])
+    view = getattr(View, view_name)([])
+    # World direction pointing into the screen (away from the camera).
+    into_screen = (np.array([0.0, 0.0, -1.0, 0.0]) @ np.linalg.inv(view.look_at))[:3]
+    far, near = base + 0.4 * into_screen, base - 0.4 * into_screen
+    mesh = Mesh(
+        faces=[far, near],
+        shader=lambda index, mesh: {"fill": "#ff0000" if index == 0 else "#0000ff"},
+    )
+    out = tmp_path / "back_to_front.svg"
+    Engine([getattr(View, view_name)([mesh])]).render(str(out))
+    svg = out.read_text()
+    assert svg.index("#ff0000") < svg.index("#0000ff")
+
+
+@pytest.mark.parametrize(
+    "bad_kwargs",
+    [
+        {"distance": 0.0},
+        {"distance": -1.0},
+        {"fov": 0.0},
+        {"fov": 180.0},
+        {"fov": -5.0},
+    ],
+)
+def test_named_views_reject_degenerate_parameters(bad_kwargs):
+    with pytest.raises(ValueError):
+        View.isometric([], **bad_kwargs)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        {"half_width": 0.0},
+        {"half_height": -1.0},
+        {"z_near": 0.0},
+        {"z_near": 2.0, "z_far": 1.0},
+    ],
+)
+def test_get_orthographic_matrix_rejects_invalid_volumes(invalid):
+    valid = {"half_width": 1.0, "half_height": 1.0, "z_near": 1.0, "z_far": 200.0}
+    with pytest.raises(ValueError):
+        get_orthographic_matrix(**(valid | invalid))
