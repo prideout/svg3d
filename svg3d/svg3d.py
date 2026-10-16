@@ -318,8 +318,13 @@ class Engine:
         return group
 
     def _sort_back_to_front(self, faces):
-        z_centroids = -np.sum(faces[:, :, 2], axis=1)
-        return np.argsort(z_centroids)
+        # Exclude padding vertices before averaging so centroid sorting is correct.
+        is_padding = np.all(faces[:, 1:, :] == faces[:, :1, :], axis=2)
+        weights = ~np.pad(is_padding, ((0, 0), (1, 0)))
+        z_centroids = -(
+            np.sum(faces[:, :, 2] * weights, axis=1) / np.sum(weights, axis=1)
+        )
+        return np.argsort(z_centroids, kind="stable")
 
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
