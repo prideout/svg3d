@@ -138,9 +138,11 @@ def get_orthographic_matrix(
     Raises
     ------
     ValueError
-        If ``half_width``/``half_height`` are not positive, or if the depth range is
-        not a valid interval (``z_near`` > 0 and ``z_far`` > ``z_near``).
+        If ``half_width``/``half_height`` are not positive and finite, or if the depth
+        range is not a valid finite interval (``z_near`` > 0 and ``z_far`` > ``z_near``)
     """
+    if not np.all(np.isfinite([half_width, half_height, z_near, z_far])):
+        raise ValueError("view volume arguments must all be finite.")
     if half_width <= 0 or half_height <= 0:
         raise ValueError("half_width and half_height must be greater than zero.")
     if z_near <= 0:
