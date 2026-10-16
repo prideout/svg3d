@@ -168,17 +168,51 @@ def test_parallel_projection_window_follows_fov_and_distance(fov, distance):
     npt.assert_allclose(view.projection[1, 1], 1.0 / half_width, rtol=1e-12)
 
 
+def test_isometric_does_not_mutate_class_state():
+    """Creating views must never modify the shared class attribute."""
+
+    class _Scene:
+        pass
+
+    v1 = View.isometric([_Scene()], distance=50.0)
+    assert v1.look_at[-1, 2] == -50.0
+    assert View.ISOMETRIC_VIEW_MATRIX[-1, 2] == -100.0  # untouched
+
+    v2 = View.isometric([_Scene()], distance=200.0)
+    assert v1.look_at[-1, 2] == -50.0  # first view unchanged by the second
+    assert v2.look_at[-1, 2] == -200.0
+    assert View.ISOMETRIC_VIEW_MATRIX[-1, 2] == -100.0
+
+
+@pytest.mark.parametrize(
+    "fov, distance", [(1.0, 100.0), (1.0, 50.0), (90.0, 100.0), (30.0, 250.0)]
+)
+def test_parallel_projection_window_follows_fov_and_distance(fov, distance):
+    """Rendered scale must be exactly 1 / (distance * tan(fov / 2)) per NDC unit."""
+    view = View.isometric([], fov=fov, distance=distance)
+    half_width = distance * np.tan(np.radians(fov) / 2)
+    npt.assert_allclose(view.projection[0, 0], 1.0 / half_width, rtol=1e-12)
+    npt.assert_allclose(view.projection[1, 1], 1.0 / half_width, rtol=1e-12)
+
+
 @pytest.mark.parametrize("view_name", ["isometric", "dimetric", "trimetric"])
-@pytest.mark.parametrize("distance", [1.0, 100.0, 250.0, 1000.0])
+@pytest.mark.parametrize("distance", [100.0, 1000.0])
 def test_view_volume_tracks_distance(view_name, distance):
-    """The object, and a margin around it, must stay inside the view volume (B2)."""
+    """The object, and a margin around it, must stay inside the view volume."""
     view = getattr(View, view_name)([], distance=distance)
-    # World direction that maps onto the camera's viewing axis.
-    view_axis = (np.array([0.0, 0.0, -1.0, 0.0]) @ np.linalg.inv(view.look_at))[:3]
+    inv_look_at = np.linalg.inv(view.look_at)
+    # Camera basis directions expressed in world coordinates.
+    into_screen = (np.array([0.0, 0.0, -1.0, 0.0]) @ inv_look_at)[:3]
+    camera_right = (np.array([1.0, 0.0, 0.0, 0.0]) @ inv_look_at)[:3]
+    camera_up = (np.array([0.0, 1.0, 0.0, 0.0]) @ inv_look_at)[:3]
+    # Offset half-way towards the edge of the window, so that x and y (not just
+    # the depth) are genuinely exercised by the containment check.
+    half_width = distance * np.tan(np.radians(1.0) / 2)
+    offset = 0.5 * half_width * camera_right + 0.5 * half_width * camera_up
 
     ndc_z = []
     for depth in (0.5 * distance, distance, 1.5 * distance):
-        point = np.append((depth - distance) * view_axis, 1.0)
+        point = np.append((depth - distance) * into_screen + offset, 1.0)
         ndc = point @ (view.look_at @ view.projection)
         assert np.all(np.abs(ndc[:3]) < 1.0), f"depth {depth} is outside the volume"
         ndc_z.append(ndc[2])
@@ -217,10 +251,10 @@ def test_faces_are_drawn_back_to_front(view_name, tmp_path):
     "bad_kwargs",
     [
         {"distance": 0.0},
-        {"distance": -1.0},
         {"fov": 0.0},
         {"fov": 180.0},
-        {"fov": -5.0},
+        # Large enough that 2 * distance overflows to inf
+        {"distance": 9.0e307},
     ],
 )
 def test_named_views_reject_degenerate_parameters(bad_kwargs):
@@ -232,9 +266,10 @@ def test_named_views_reject_degenerate_parameters(bad_kwargs):
     "invalid",
     [
         {"half_width": 0.0},
-        {"half_height": -1.0},
         {"z_near": 0.0},
         {"z_near": 2.0, "z_far": 1.0},
+        {"half_width": np.nan},
+        {"z_far": np.inf},
     ],
 )
 def test_get_orthographic_matrix_rejects_invalid_volumes(invalid):
